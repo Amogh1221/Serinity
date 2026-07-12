@@ -1,137 +1,58 @@
 # Serinity - Mental Healthcare Voice Assistant (On-Device Edition)
 
-An intelligent, **production-ready** psychiatric assessment system powered by Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). Dr. Aiden conducts empathetic clinical interviews, analyzes conversation patterns, and provides evidence-based psychological insights grounded in clinical psychopathology literature.
-
-> **OSDHack 2026 Submission:** This project has been explicitly engineered for the **On Device AI** theme. The entire AI stack—Speech-to-Text, Conversational LLM, Pattern Analysis LLM, and Vector Database—runs 100% locally on the device. No cloud AI APIs are used.
-
-This project prioritizes patient privacy, eliminates cloud latency, and provides completely offline, intelligent mental health care.
-
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Local%20Vector%20DB-orange.svg)](https://www.trychroma.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20Inference-black.svg)](https://ollama.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Amogh1221/Serinity/blob/main/LICENSE)
 
-## Overview
-
-**Serinity** is built with cutting-edge AI technology, running entirely on your local machine:
-
-- **Dual-LLM Architecture (via Ollama)**: Two specialized language models working together.
-  - **LLM1 (Conversational)**: `phi4-mini` acts as an empathetic psychiatric interviewer with therapeutic rapport-building.
-  - **LLM2 (Analyst)**: `qwen2.5:7b-instruct` acts as the advanced pattern recognition engine across multiple psychological domains.
-  
-- **Local RAG (Retrieval-Augmented Generation)**: Semantic search over 122k+ psychiatric Q&A pairs via a local **ChromaDB** instance.
-  
-- **Advanced Voice Processing**:
-  - **STT (Speech-to-Text)**: **SenseVoice-Small** (via FunASR) for real-time audio transcription and emotion detection.
-  - **TTS (Text-to-Speech)**: Browser-native Web Speech API for natural voice output with zero latency.
-
-- **Patient Dashboard**: Persistent SQLite-backed patient memory allowing you to track previous session summaries and risk assessments.
-
-This system is designed for **educational and research purposes** to demonstrate enterprise-grade AI in healthcare.
+> **OSDHack 2026 Submission:** This project has been explicitly engineered for the **On Device AI** theme.
 
 ---
 
-## Key Features
+## 🚀 What We Built
+**Serinity** is an intelligent, production-ready psychiatric assessment system powered by Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). It features a conversational AI (Dr. Aiden) that conducts empathetic clinical interviews via a natural voice interface. Behind the scenes, the system analyzes conversation patterns in real-time and provides evidence-based psychological insights grounded in clinical psychopathology literature.
 
-### Advanced Voice Interface
-- **Real-time Speech Recognition**: Powered by SenseVoice-Small, providing transcription and emotion tagging directly from the audio signal.
-- **Natural Voice Output**: Browser-native TTS with zero server-side latency.
-- **Cross-platform**: Works on Chrome, Edge, Safari.
+## 💡 Why It Matters
+Mental healthcare is heavily stigmatized, expensive, and largely inaccessible for millions. While AI has the potential to bridge this gap, putting highly sensitive mental health and conversational data into the cloud raises massive privacy concerns. 
 
-### Intelligent Dual-LLM System
-- **LLM1 (phi4-mini)**: Fluid conversational model running locally.
-- **LLM2 (qwen2.5:7b-instruct)**: Clinical reasoning and pattern extraction running locally.
-- **Decision Logic**: Intelligent CONTINUE/ANALYZE intent routing.
-- **Context Awareness**: Full conversation history with intelligent trimming and rolling summaries.
+**Serinity matters because it provides enterprise-grade, intelligent psychiatric assessment completely offline.** By running locally on the user's device, we guarantee absolute data privacy. Users can speak freely about their mental state without fear of their data being harvested, leaked, or used for model training by third-party cloud providers. Furthermore, an offline-first approach eliminates cloud API latency, providing a seamless, real-time voice experience.
 
-### Clinical Knowledge Integration
-- **122k+ Q&A Pairs**: From clinical texts like "Sims' Symptoms in the Mind".
-- **Semantic Search**: ChromaDB for instant local retrieval using `nomic-embed-text` embeddings.
-- **Local Vector DB**: Fully offline, no internet connection required to query clinical knowledge.
+## ⚙️ How It Works
+Serinity utilizes a "Sync Fast-Path, Async Slow-Path" architecture combining two specialized models and local semantic search:
 
-### Multi-Domain Pattern Analysis
-When analysis is triggered, LLM2 identifies patterns across:
-- Emotional Themes: Mood states, anhedonia, emotional regulation
-- Thinking Patterns: Rumination, catastrophizing, intrusive thoughts
-- Behavioral Patterns: Sleep, appetite, social withdrawal, self-care
-- Interpersonal Dynamics: Relationship patterns, social functioning
-- Stressors: Identified triggers and life challenges
-- Unclear Areas: Information gaps for targeted exploration
-- **Risk Assessment**: Continuous safety monitoring and flagging.
-- Protective Factors: Patient strengths and resources.
+1. **Dual-LLM Architecture (via Ollama)**: 
+   - **LLM1 (Conversational)**: `phi4-mini` handles real-time dialogue, acting as an empathetic interviewer with therapeutic rapport-building capabilities.
+   - **LLM2 (Analyst)**: `qwen2.5:7b-instruct` runs asynchronous, heavy pattern-recognition across multiple psychological domains (Emotional Themes, Behavioral Patterns, Risk Assessment, etc.).
+2. **Local RAG Pipeline**: Uses a local **ChromaDB** instance to perform semantic searches over 122k+ psychiatric Q&A pairs (using `nomic-embed-text` embeddings), providing clinical context to the LLMs.
+3. **Voice Processing**: Uses **SenseVoice-Small** via FunASR for Speech-to-Text and emotional tone detection, while utilizing the Browser-native Web Speech API for zero-latency Text-to-Speech.
+4. **Session Management**: Persistent SQLite-backed patient memory tracks previous session summaries and continuously evaluates safety risk flags.
 
-### Session Management & Patient Profiles
-- **Patient Dashboard**: Create and select patient profiles.
-- **Persistent Memory**: SQLite backing tracks past session summaries and integrates them into future contexts.
-- **Risk Flagging**: Proactive keyword and NLU-based safety guardrails.
-
-### Production-Grade UI
-- Tailwind CSS Styling: Modern, responsive design.
-- Real-time Feedback: Typing indicators, recording animations.
-- Accessibility: WCAG-compliant with keyboard navigation.
+## 📱 How It Uses On Device AI
+This project strictly adheres to the **On Device AI** theme. **The entire AI stack runs 100% locally on the device.** No cloud AI APIs are used.
+* **Local Inference:** LLMs are hosted entirely on the local machine using Ollama.
+* **Local Vector DB:** ChromaDB stores and retrieves all clinical embeddings locally.
+* **Local Speech AI:** SenseVoice processes audio on-device without sending voice bytes to external servers.
 
 ---
 
-## System Architecture
+## 🎥 Demo Video & Screenshots
+> **Note to evaluator:** 
+* [Link to Demo Video](#) *(Insert YouTube/Vimeo link here)*
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                       Frontend (Browser)                           │
-│  - HTML5 Tailwind UI (Dashboard + Chat)                            │
-│  - Web Audio API (Microphone)                                      │
-│  - Web Speech API (TTS)                                            │
-└────────────────────┬───────────────────────────────────────────────┘
-                     │ HTTP/WebSocket
-                     ▼
-┌────────────────────────────────────────────────────────────────────┐
-│              FastAPI Backend (0.0.0.0:7860)                        │
-│  - Session Management (SQLite memory_store)                        │
-│  - Request/Response Routing                                        │
-└──────┬──────────────────────────────────────────────────────┬──────┘
-       │                                                      │
-       ▼                                                      ▼
-  ┌─────────────┐                                  ┌──────────────────┐
-  │  FunASR     │                                  │     Ollama       │
-  │   (Local)   │                                  │   (Local LLM)    │
-  │ SenseVoice  │                                  │                  │
-  │ STT+Emotion │                                  │  • LLM1          │
-  └─────────────┘                                  │  • LLM2          │
-                                                   └────────┬─────────┘
-                                                            │
-                                                   ┌────────▼───────────┐
-                                                   │      ChromaDB      │
-                                                   │    (Local Vector)  │
-                                                   │  • 122k+ embeddings│
-                                                   │  • nomic-embed-text│
-                                                   └────────────────────┘
-```
+### Screenshots
+*(Insert screenshots here showcasing the UI, dashboard, and terminal logs)*
 
 ---
 
-## Tech Stack
+## 🛠️ How Others Can Run or Try It (Setup Instructions)
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Backend Framework** | FastAPI | RESTful API, async processing |
-| **LLM Inference** | Ollama | Local LLM hosting |
-| **LLM Models** | phi4-mini & qwen2.5:7b-instruct | Language understanding & generation |
-| **Vector Database** | ChromaDB | Local semantic search |
-| **Embeddings** | nomic-embed-text | Local text vectorization |
-| **Speech Recognition** | SenseVoice-Small (FunASR) | Audio transcription and emotion detection |
-| **Frontend Framework** | HTML5 + Tailwind CSS + Vanilla JS | Responsive UI |
-| **Storage** | SQLite | Persistent session and patient profiles |
-
----
-
-## Prerequisites
-
-### Required
+### Prerequisites
 - **Python 3.11+**
 - **Ollama** installed on your machine.
 - **FFmpeg** (for audio processing).
 
-### Ollama Setup
+### 1. Ollama Setup
 Before running the application, ensure Ollama is running and pull the necessary models:
 ```bash
 ollama run phi4-mini
@@ -139,8 +60,26 @@ ollama run qwen2.5:7b-instruct
 ollama run nomic-embed-text
 ```
 
-### Environment Configuration
-Configure your local environment using a `.env` file based on your machine's capabilities.
+### 2. Installation
+Clone the repository and set up the environment:
+```bash
+git clone https://github.com/Amogh1221/Serinity.git
+cd Serinity
+
+# Create and activate a virtual environment
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r Requirements.txt
+```
+
+### 3. Environment Configuration
+Create a `.env` file in the root directory:
 ```env
 OLLAMA_HOST=http://localhost:11434
 LLM1_MODEL=phi4-mini
@@ -149,45 +88,20 @@ EMBEDDING_MODEL=nomic-embed-text
 MEMORY_DB_PATH=./data/serinity.db
 ```
 
----
+### 4. Initialize Database & Run
+```bash
+# Populate the ChromaDB vector database (Run this once)
+python scripts/build_vector_db.py
 
-## Getting Started
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/Amogh1221/Serinity.git
-   cd Serinity
-   ```
-
-2. **Create and activate a virtual environment:**
-   ```bash
-   python -m venv .venv
-   # Windows
-   .venv\Scripts\activate
-   # macOS/Linux
-   source .venv/bin/activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r Requirements.txt
-   ```
-
-4. **Initialize the Vector Database:**
-   (Ensure you run this once before starting the server to populate ChromaDB)
-   ```bash
-   python scripts/build_vector_db.py
-   ```
-
-5. **Start the FastAPI server:**
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port 7860
-   ```
-
-6. **Access the application:**
-   Open your browser and navigate to `http://localhost:7860`.
+# Start the FastAPI server
+uvicorn main:app --host 0.0.0.0 --port 7860
+```
+Open your browser and navigate to `http://localhost:7860` to access the application.
 
 ---
+
+## 📄 License
+This project is licensed under the [MIT License](LICENSE).
 
 ## Disclaimer
-This application is for educational and research purposes only. It is not intended to be a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified health provider with any questions you may have regarding a medical condition.
+This application is for educational and hackathon demonstration purposes only. It is not intended to be a substitute for professional medical advice, diagnosis, or treatment.
