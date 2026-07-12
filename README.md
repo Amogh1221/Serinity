@@ -10,7 +10,7 @@ This project prioritizes patient privacy, eliminates cloud latency, and provides
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Local%20Vector%20DB-orange.svg)](https://www.trychroma.com/)
 [![Ollama](https://img.shields.io/badge/Ollama-Local%20Inference-black.svg)](https://ollama.com/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Amogh1221/Mental_HealthCare_VoiceAssistant/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Amogh1221/Serinity/blob/main/LICENSE)
 
 ## Overview
 
@@ -155,8 +155,8 @@ MEMORY_DB_PATH=./data/serinity.db
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/Amogh1221/Mental_HealthCare_VoiceAssistant.git
-   cd Mental_HealthCare_VoiceAssistant
+   git clone https://github.com/Amogh1221/Serinity.git
+   cd Serinity
    ```
 
 2. **Create and activate a virtual environment:**
