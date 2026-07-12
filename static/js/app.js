@@ -5,9 +5,14 @@ const BACKEND_URL = "";
 let sessionId = null;
 let patientId = localStorage.getItem("serinity_patient_id") || null;
 let isListening = false;
-let isVoiceMode = true;
+let isVoiceMode = false; // Default to text mode per clinical feel
 let mediaRecorder;
 let audioChunks = [];
+
+// Session stats
+let exchangeCount = 0;
+let sessionStartTime = null;
+let sessionInterval = null;
 
 const chat = document.getElementById("chat");
 const chatWrapper = document.getElementById("chatWrapper");
@@ -28,10 +33,6 @@ const chatInput = document.getElementById("chatInput");
 const sendBtn = document.getElementById("sendBtn");
 
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
-const headerRole = document.getElementById("headerRole");
-if (headerRole) {
-  headerRole.textContent = isMobile ? "Dr. Sarah - AI Psychiatrist" : "Dr. Aiden - AI Psychiatrist";
-}
 
 let typingNode = null;
 
@@ -41,40 +42,89 @@ function scrollToBottom() {
   }, 100);
 }
 
-function addMessage(text, role) {
-  const messageDiv = document.createElement("div");
-  messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} fade-in`;
-
-  const bubble = document.createElement("div");
-  bubble.className = `max-w-[85%] sm:max-w-[75%] px-4 sm:px-5 py-3 rounded-2xl ${role === 'user'
-      ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-tr-md'
-      : 'bg-slate-700/50 text-slate-100 rounded-tl-md border border-slate-600/30'
-    } shadow-lg`;
-
-  bubble.textContent = text;
-  messageDiv.appendChild(bubble);
-  chat.appendChild(messageDiv);
-  scrollToBottom();
+function updateSessionStats() {
+  if (!sessionStartTime) return;
+  const statsEl = document.getElementById("sessionStats");
+  if (!statsEl) return;
+  const elapsed = Math.floor((Date.now() - sessionStartTime) / 60000);
+  statsEl.textContent = `Session · ${elapsed} min · ${exchangeCount} exchanges`;
 }
 
-function addTyping() {
+function addMessage(text, role) {
+  const messageDiv = document.createElement("div");
+  messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} fade-in w-full mb-6`;
+
+  const contentDiv = document.createElement("div");
+  
+  if (role === 'assistant') {
+    const label = document.createElement("span");
+    label.className = "assistant-label";
+    label.textContent = "ASSISTANT ·";
+    contentDiv.appendChild(label);
+    contentDiv.className = "pl-4 border-l-2 border-moss max-w-[85%] sm:max-w-[75%]";
+  } else {
+    const label = document.createElement("span");
+    label.className = "assistant-label text-right block";
+    const dashName = document.getElementById("dashboardPatientName");
+    const userName = dashName ? dashName.innerText : "USER";
+    label.textContent = "· " + userName.toUpperCase();
+    contentDiv.appendChild(label);
+    contentDiv.className = "pr-4 border-r-2 border-clay text-right max-w-[85%] sm:max-w-[75%]";
+  }
+
+  const textNode = document.createElement("p");
+  textNode.className = "text-ink whitespace-pre-wrap";
+  textNode.textContent = text;
+  contentDiv.appendChild(textNode);
+  
+  messageDiv.appendChild(contentDiv);
+  chat.appendChild(messageDiv);
+  scrollToBottom();
+  
+  if (role === 'user') {
+    exchangeCount++;
+    updateSessionStats();
+  }
+}
+
+function addTyping(isUser = false, customText = null) {
   if (typingNode) return;
 
   const messageDiv = document.createElement("div");
-  messageDiv.className = "flex justify-start fade-in";
+  messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} fade-in w-full mb-6`;
 
-  const bubble = document.createElement("div");
-  bubble.className = "px-5 py-4 rounded-2xl rounded-tl-md bg-slate-700/30 border border-slate-600/30";
+  const contentDiv = document.createElement("div");
+  
+  if (!isUser) {
+    const label = document.createElement("span");
+    label.className = "assistant-label";
+    label.textContent = "ASSISTANT ·";
+    contentDiv.appendChild(label);
+    contentDiv.className = "pl-4 border-l-2 border-moss max-w-[85%] sm:max-w-[75%]";
+  } else {
+    const label = document.createElement("span");
+    label.className = "assistant-label text-right block";
+    const dashName = document.getElementById("dashboardPatientName");
+    const userName = dashName ? dashName.innerText : "USER";
+    label.textContent = "· " + userName.toUpperCase();
+    contentDiv.appendChild(label);
+    contentDiv.className = "pr-4 border-r-2 border-clay text-right max-w-[85%] sm:max-w-[75%]";
+  }
 
-  bubble.innerHTML = `
-    <div class="typing-indicator flex gap-1">
-      <span></span>
-      <span></span>
-      <span></span>
-    </div>
-  `;
-
-  messageDiv.appendChild(bubble);
+  if (customText) {
+    const textNode = document.createElement("p");
+    textNode.className = "text-moss text-sm italic font-utility animate-pulse";
+    textNode.textContent = customText;
+    contentDiv.appendChild(textNode);
+  } else {
+    const indicator = document.createElement("div");
+    indicator.className = "typing-indicator flex gap-1 mt-2" + (isUser ? " justify-end" : "");
+    indicator.innerHTML = `<span></span><span></span><span></span>`;
+    contentDiv.appendChild(indicator);
+  }
+  
+  messageDiv.appendChild(contentDiv);
+  
   typingNode = messageDiv;
   chat.appendChild(messageDiv);
   scrollToBottom();
@@ -130,10 +180,10 @@ async function handleAssistantResponses(message) {
 
   // 2. If there's a follow-up, show it with a brief therapeutic pause
   if (parts[1]) {
-    statusText.textContent = "Dr. Aiden is thinking...";
+    statusText.textContent = "Assistant is thinking...";
     await sleep(500);
 
-    addTyping();
+    addTyping(false, "Thinking...");
     await sleep(500);
     removeTyping();
 
@@ -154,7 +204,7 @@ function speak(text) {
       window.speechSynthesis.cancel();
     }
 
-    statusText.textContent = "Dr. Aiden is responding...";
+    statusText.textContent = "Assistant is responding...";
 
     const utterance = new SpeechSynthesisUtterance(text);
     const selectedVoiceName = voiceSelect.value;
@@ -169,7 +219,7 @@ function speak(text) {
     utterance.pitch = 1.0;
 
     utterance.onstart = () => {
-      statusText.textContent = "Dr. Aiden is speaking...";
+      statusText.textContent = "Assistant is speaking...";
     };
 
     utterance.onend = () => {
@@ -242,14 +292,55 @@ async function showDashboard(pId) {
         const d = new Date(sess.created_at).toLocaleString();
         const summary = sess.rolling_summary || "No summary available.";
         list.innerHTML += `
-          <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
-            <div class="text-xs text-blue-400 font-bold mb-2">${d}</div>
-            <div class="text-sm text-slate-300 whitespace-pre-wrap">${summary}</div>
-          </div>
+          <details class="group p-4 border border-ink bg-paper shadow-sm mb-3">
+            <summary class="text-xs text-moss font-utility tracking-widest uppercase cursor-pointer select-none group-open:mb-2 flex justify-between">
+              ${d}
+              <span class="text-ink transition-transform group-open:rotate-180">▼</span>
+            </summary>
+            <div class="text-sm text-ink whitespace-pre-wrap mt-2 pl-2 border-l-2 border-clay">${summary}</div>
+          </details>
         `;
       });
     } else {
-      list.innerHTML = `<p class="text-slate-500 text-center italic mt-10">No previous sessions found.</p>`;
+      list.innerHTML = `<p class="text-clay text-sm italic">No previous sessions found.</p>`;
+    }
+    
+    // Render profile domains
+    const domainsDiv = document.getElementById("dashboardDomains");
+    if (domainsDiv && data.profile) {
+      domainsDiv.innerHTML = `<h3 class="font-utility uppercase text-clay text-sm border-b border-ink/30 pb-2">Clinical Profile</h3>`;
+      const renderDomain = (title, items) => {
+        if (!items || items.length === 0) return;
+        const html = `
+          <details class="group mt-4 border-b border-clay/30 pb-2 cursor-pointer">
+            <summary class="dashboard-label mb-1 select-none flex justify-between">
+              ${title}
+              <span class="text-ink text-xs transition-transform group-open:rotate-180">▼</span>
+            </summary>
+            <ul class="list-disc pl-5 text-sm dashboard-value space-y-1 mt-2 text-ink">
+              ${items.map(i => `<li>${i}</li>`).join('')}
+            </ul>
+          </details>
+        `;
+        domainsDiv.innerHTML += html;
+      };
+      
+      renderDomain("Emotional Themes", data.profile.emotional_themes);
+      renderDomain("Thinking Patterns", data.profile.thinking_patterns);
+      renderDomain("Stressors", data.profile.stressors);
+      renderDomain("Protective Factors", data.profile.protective_factors);
+      
+      if (data.profile.risk_assessment) {
+        domainsDiv.innerHTML += `
+          <details class="group mt-4 border-b border-clay/30 pb-2 cursor-pointer">
+            <summary class="dashboard-label mb-1 select-none flex justify-between">
+              Risk Assessment
+              <span class="text-ink text-xs transition-transform group-open:rotate-180">▼</span>
+            </summary>
+            <p class="text-sm dashboard-value mt-2 text-ink">${data.profile.risk_assessment}</p>
+          </details>
+        `;
+      }
     }
     
     profileSelectionScreen.style.display = "none";
@@ -281,8 +372,6 @@ document.getElementById("selectProfileBtn").onclick = async () => {
   const dropdown = document.getElementById("patientDropdown");
   patientId = dropdown.value;
   localStorage.setItem("serinity_patient_id", patientId);
-  const selectedText = dropdown.options[dropdown.selectedIndex].text;
-  document.getElementById("activePatientDisplay").textContent = `Patient: ${selectedText.split(" (")[0]}`;
   await showDashboard(patientId);
 };
 
@@ -290,8 +379,15 @@ document.getElementById("selectProfileBtn").onclick = async () => {
 document.getElementById("createProfileBtn").onclick = async () => {
   const nameInput = document.getElementById("newPatientName");
   const ageInput = document.getElementById("newPatientAge");
+  const genderInput = document.getElementById("newPatientGender");
+  const occupationInput = document.getElementById("newPatientOccupation");
+  const concernInput = document.getElementById("newPatientConcern");
+  
   const name = nameInput.value.trim();
   const age = ageInput.value ? parseInt(ageInput.value) : null;
+  const gender = genderInput ? genderInput.value : null;
+  const occupation = occupationInput ? occupationInput.value.trim() : null;
+  const primary_concern = concernInput ? concernInput.value.trim() : null;
 
   if (!name) {
     alert("Please enter a name for the new profile.");
@@ -302,12 +398,17 @@ document.getElementById("createProfileBtn").onclick = async () => {
     const createRes = await fetch(`${BACKEND_URL}/patients/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name, age: age })
+      body: JSON.stringify({ 
+        name: name, 
+        age: age,
+        gender: gender,
+        occupation: occupation,
+        primary_concern: primary_concern
+      })
     });
     const pData = await createRes.json();
     patientId = pData.patient_id;
     localStorage.setItem("serinity_patient_id", patientId);
-    document.getElementById("activePatientDisplay").textContent = `Patient: ${name}`;
     await showDashboard(patientId);
   } catch (e) {
     console.error("Failed to create profile:", e);
@@ -355,6 +456,13 @@ async function startActualSession(pId) {
     loadingScreen.style.display = "none";
     mainApp.style.display = "flex";
 
+    // Setup session stats
+    sessionStartTime = Date.now();
+    exchangeCount = 0;
+    updateSessionStats();
+    if (sessionInterval) clearInterval(sessionInterval);
+    sessionInterval = setInterval(updateSessionStats, 60000);
+
     // Render first message in UI and speak
     handleAssistantResponses(data.assistant_message);
   } catch (e) {
@@ -383,20 +491,16 @@ window.onload = initializeSession;
 // Mode toggle
 voiceModeBtn.onclick = () => {
   isVoiceMode = true;
-  voiceModeBtn.classList.remove("bg-slate-700/50", "text-slate-400");
-  voiceModeBtn.classList.add("bg-blue-600", "text-white");
-  textModeBtn.classList.remove("bg-blue-600", "text-white");
-  textModeBtn.classList.add("bg-slate-700/50", "text-slate-400");
+  voiceModeBtn.classList.add("active");
+  textModeBtn.classList.remove("active");
   voiceInput.style.display = "flex";
   textInput.style.display = "none";
 };
 
 textModeBtn.onclick = () => {
   isVoiceMode = false;
-  textModeBtn.classList.remove("bg-slate-700/50", "text-slate-400");
-  textModeBtn.classList.add("bg-blue-600", "text-white");
-  voiceModeBtn.classList.remove("bg-blue-600", "text-white");
-  voiceModeBtn.classList.add("bg-slate-700/50", "text-slate-400");
+  textModeBtn.classList.add("active");
+  voiceModeBtn.classList.remove("active");
   voiceInput.style.display = "none";
   textInput.style.display = "block";
   chatInput.focus();
@@ -404,7 +508,7 @@ textModeBtn.onclick = () => {
 
 async function sendTextMessage(message, emotion = null) {
   addMessage(message, "user");
-  addTyping();
+  addTyping(false, "Analyzing...");
 
   try {
     const response = await fetch(`${BACKEND_URL}/chat_text`, {
@@ -423,11 +527,25 @@ async function sendTextMessage(message, emotion = null) {
     await handleAssistantResponses(data.assistant_message);
 
     if (data.risk_flagged) {
-      document.getElementById("safetyBanner").style.display = "block";
-      const displayLabel = document.getElementById("activePatientDisplay");
-      if (displayLabel) {
-        displayLabel.classList.remove("text-blue-400");
-        displayLabel.classList.add("text-red-400", "animate-pulse");
+      if (!document.getElementById("safetyBanner")) {
+        const banner = document.createElement("div");
+        banner.id = "safetyBanner";
+        banner.className = "bg-signal text-paper p-4 shadow-md z-50 fixed top-0 left-0 right-0 fade-in";
+        banner.innerHTML = `
+          <div class="max-w-5xl mx-auto flex w-full justify-between items-start">
+            <div>
+              <h3 class="font-utility uppercase tracking-widest text-sm mb-1 font-bold">Emergency Support</h3>
+              <p class="text-sm">You are not alone. Free, confidential support is available right now.</p>
+              <ul class="list-none text-sm font-utility space-y-1 mt-2">
+                <li>iCall (TISS): 9152987821</li>
+                <li>Kiran: 1800-599-0019</li>
+                <li>Vandrevala: 1860-2662-345</li>
+              </ul>
+            </div>
+            <button onclick="document.getElementById('safetyBanner').remove()" class="text-paper hover:opacity-70 text-2xl font-bold p-2 cursor-pointer leading-none">&times;</button>
+          </div>
+        `;
+        document.body.appendChild(banner);
       }
     }
   } catch (err) {
@@ -467,7 +585,7 @@ async function startRecording() {
       formData.append('audio', audioBlob, 'recording.webm');
 
       statusText.textContent = "Transcribing your voice...";
-      addTyping();
+      addTyping(true, "Transcribing...");
 
       try {
         const response = await fetch(`${BACKEND_URL}/transcribe`, {

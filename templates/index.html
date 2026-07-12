@@ -3,122 +3,155 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Serinity - Mental Healthcare Assistant</title>
+  <title>Serinity - Mental Healthcare</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/css/style.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: '#F6F3EE',
+            ink: '#262521',
+            moss: '#4B6358',
+            clay: '#9C7A5B',
+            signal: '#B4483C'
+          }
+        }
+      }
+    }
+  </script>
 </head>
-<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen flex flex-col">
+<body class="bg-paper text-ink min-h-screen flex flex-col font-body">
 
-  <!-- Loading Screen / Front Page -->
-  <div id="loadingScreen">
-    <svg class="brain-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path stroke="url(#gradient)" stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-      <defs>
-        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-          <stop offset="50%" style="stop-color:#8b5cf6;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
-        </linearGradient>
-      </defs>
-    </svg>
-    
+  <!-- Loading Screen -->
+  <div id="loadingScreen" class="fixed inset-0 bg-paper z-50 flex flex-col items-center justify-center transition-opacity duration-500">
     <h1 class="logo-text">Serinity</h1>
-    <p class="tagline">Mental Healthcare Assistant</p>
-    
     <div class="loading-dots" id="loadingDots">
       <span></span>
       <span></span>
       <span></span>
     </div>
-    
-    <button class="start-button" id="startButton" disabled>
+    <button class="btn-primary mt-8" id="startButton" disabled>
       Initializing...
     </button>
-    <p id="wakeupText" class="text-sm text-slate-400 mt-4 animate-pulse text-center max-w-xs mx-auto">
-      Waking up backend... (this might take up to 50 seconds if the space was asleep)
+    <p id="wakeupText" class="text-sm text-clay mt-4 text-center max-w-xs mx-auto font-utility">
+      Validating credentials...
     </p>
   </div>
 
-  <!-- Patient Profile Selection Dialog -->
-  <div id="profileSelectionScreen" style="display: none;" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 flex flex-col items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-6">
-      <div class="text-center space-y-2">
-        <h2 class="text-2xl font-bold text-white">Patient Profile</h2>
-        <p class="text-slate-400 text-sm">Please select a returning profile or create a new one to begin.</p>
+  <!-- Profile Selection Screen -->
+  <div id="profileSelectionScreen" style="display: none;" class="fixed inset-0 bg-paper z-40 flex flex-col items-center justify-center p-4">
+    <div class="panel p-8 max-w-md w-full">
+      <div class="mb-8">
+        <h2 class="text-2xl font-display text-ink mb-2">Patient Records</h2>
+        <p class="text-clay text-sm">Access an existing clinical file or open a new one.</p>
       </div>
 
       <!-- Returning Profile Selection -->
-      <div class="space-y-3">
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Returning Patient</label>
+      <div class="space-y-3 mb-8">
+        <label class="block text-xs font-utility text-ink uppercase tracking-wider">Existing Patient</label>
         <select 
           id="patientDropdown" 
-          class="w-full bg-slate-800/80 border border-slate-700 text-white rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition"
+          class="w-full bg-transparent border border-ink text-ink rounded-none px-4 py-3 outline-none focus:border-moss transition"
         >
-          <option value="">-- Choose Profile --</option>
+          <option value="">-- Select File --</option>
         </select>
         <button 
           id="selectProfileBtn" 
-          class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-lg shadow-indigo-600/30"
+          class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm"
           disabled
         >
-          Select Profile
+          Open File
         </button>
       </div>
 
-      <div class="flex items-center my-4">
-        <div class="flex-1 border-t border-slate-800"></div>
-        <span class="mx-3 text-xs text-slate-500 uppercase tracking-widest font-bold">OR</span>
-        <div class="flex-1 border-t border-slate-800"></div>
+      <div class="flex items-center my-6">
+        <div class="flex-1 border-t border-ink"></div>
+        <span class="mx-4 text-xs text-clay uppercase tracking-widest font-utility">OR</span>
+        <div class="flex-1 border-t border-ink"></div>
       </div>
 
       <!-- Create New Profile -->
       <div class="space-y-4">
-        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Create New Profile</label>
-        <div class="space-y-3">
-          <input 
-            type="text" 
-            id="newPatientName" 
-            placeholder="Full Name" 
-            class="w-full bg-slate-800/80 border border-slate-700 text-white rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition"
-          />
-          <input 
-            type="number" 
-            id="newPatientAge" 
-            placeholder="Age (Optional)" 
-            class="w-full bg-slate-800/80 border border-slate-700 text-white rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition"
-          />
-        </div>
-        <button 
-          id="createProfileBtn" 
-          class="w-full bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 font-bold py-3 rounded-xl transition"
-        >
-          Create & Start
-        </button>
+        <details class="group border border-ink bg-paper p-4 cursor-pointer open:pb-4">
+          <summary class="block text-xs font-utility text-ink uppercase tracking-wider select-none outline-none">
+            + Create New Profile
+          </summary>
+          <div class="space-y-3 mt-4 cursor-default" onclick="event.stopPropagation()">
+            <div>
+              <label class="block text-xs font-utility text-clay uppercase mb-1">Full Name</label>
+              <input type="text" id="newPatientName" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="Jane Doe">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-utility text-clay uppercase mb-1">Age</label>
+                <input type="number" id="newPatientAge" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="e.g. 34">
+              </div>
+              <div>
+                <label class="block text-xs font-utility text-clay uppercase mb-1">Gender</label>
+                <select id="newPatientGender" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink">
+                  <option value="">Select</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Non-binary">Non-binary</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-utility text-clay uppercase mb-1">Occupation</label>
+              <input type="text" id="newPatientOccupation" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="e.g. Software Engineer">
+            </div>
+
+            <button 
+              id="createProfileBtn" 
+              class="w-full bg-transparent border border-ink hover:bg-ink hover:text-paper text-ink transition py-3 font-utility uppercase tracking-widest text-sm mt-4"
+            >
+              CREATE FILE
+            </button>
+          </div>
+        </details>
       </div>
     </div>
   </div>
 
   <!-- Patient Dashboard -->
-  <div id="dashboardScreen" style="display: none;" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 flex flex-col items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl space-y-6 max-h-[90vh] flex flex-col">
-      <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+  <div class="hidden max-w-5xl mx-auto w-full h-screen p-4 flex-col fade-in overflow-hidden" id="dashboardScreen">
+    <div class="bg-paper border border-ink p-6 lg:p-10 flex-1 flex flex-col min-h-0 h-full">
+      
+      <!-- Header -->
+      <div class="flex justify-between items-start border-b border-ink/30 pb-6 mb-6 shrink-0">
         <div>
-          <h2 class="text-2xl font-bold text-white" id="dashboardPatientName">Patient Name</h2>
-          <p class="text-slate-400 text-sm" id="dashboardPatientAge">Age: --</p>
+          <h2 class="text-3xl font-display text-ink" id="dashboardPatientName">Patient Name</h2>
+          <p class="text-xs font-utility tracking-widest uppercase text-clay mt-2" id="dashboardPatientAge">Age: --</p>
         </div>
-        <button id="dashboardStartBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2 px-6 rounded-xl transition shadow-lg shadow-indigo-600/30">
-          Start New Session
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-2" id="dashboardSessionsList">
-        <p class="text-slate-500 text-center italic mt-10">Loading previous sessions...</p>
+        <button class="btn-primary" id="dashboardStartBtn">START SESSION</button>
       </div>
       
-      <div class="pt-4 border-t border-slate-800 text-left">
-        <button id="dashboardBackBtn" class="text-slate-400 hover:text-white transition text-sm flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-          Switch Profile
+      <!-- Content -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-10 flex-1 min-h-0 overflow-hidden" id="dashboardContent">
+        <!-- Profile left -->
+        <div class="space-y-6 overflow-y-auto pr-4 custom-scrollbar" id="dashboardDomains">
+          <h3 class="font-utility uppercase text-clay text-sm border-b border-ink/30 pb-2">Clinical Profile</h3>
+          <p class="text-clay text-sm italic">Loading profile data...</p>
+        </div>
+        
+        <!-- Column 2: Session History -->
+        <div class="flex flex-col min-h-0 h-full">
+          <h3 class="font-utility uppercase text-clay text-sm border-b border-ink/30 pb-2 mb-4 shrink-0">Session History</h3>
+          <div id="dashboardSessionsList" class="flex-1 overflow-y-auto pr-4 space-y-4 custom-scrollbar">
+            <p class="text-clay text-sm italic">Loading previous sessions...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="mt-8 pt-6 border-t border-ink/30 shrink-0">
+        <button class="text-xs font-utility tracking-widest text-clay hover:text-ink uppercase transition flex items-center gap-2" id="dashboardBackBtn">
+          <span>&larr;</span> CLOSE FILE
         </button>
       </div>
     </div>
@@ -127,107 +160,71 @@
   <!-- Main App (Hidden Initially) -->
   <div id="mainApp" style="display: none;" class="flex flex-col h-screen">
     <!-- Header -->
-    <header class="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700/50 z-10">
-      <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-            </svg>
-          </div>
-          <div>
-            <h1 class="text-xl font-bold text-white" id="headerName">Serinity</h1>
-            <p class="text-xs text-slate-400" id="headerRole">Dr. Aiden - AI Psychiatrist</p>
-            <span id="activePatientDisplay" class="text-xs text-blue-400 font-semibold block mt-0.5"></span>
-          </div>
+    <header class="bg-paper border-b border-ink z-10 py-3">
+      <div class="w-full px-6 md:px-12 mx-auto flex items-center justify-between">
+        <div>
+          <h1 class="text-xl font-display text-ink" id="headerName">Serinity</h1>
+          <p class="text-xs font-utility text-clay tracking-widest uppercase">Clinical Session</p>
         </div>
-        <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-4">
+          <span id="sessionStats" class="text-xs font-utility text-moss uppercase hidden sm:block"></span>
           <select 
             id="voiceSelect" 
-            class="bg-slate-700/50 hover:bg-slate-700 text-white rounded-lg px-2 py-2 text-sm font-medium border border-slate-600 outline-none max-w-[120px] sm:max-w-[180px]"
+            class="bg-paper border border-ink text-ink text-sm font-utility px-3 py-1.5 outline-none focus:border-moss w-[180px] sm:w-[220px] cursor-pointer hover:bg-ink/5 truncate"
           >
-            <option value="">Select Voice...</option>
+            <option value="">Voice: Off</option>
           </select>
           <button 
             id="endSessionBtn" 
-            class="px-2 sm:px-4 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium border border-red-900/50"
+            class="text-signal hover:text-signal/70 transition-colors text-sm font-utility uppercase tracking-wide border border-signal px-3 py-1.5"
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-            <span class="hidden sm:inline">End Session</span>
+            End Session
           </button>
         </div>
       </div>
     </header>
 
-
-
-    <!-- Safety Support Banner (Hidden by default) -->
-    <div id="safetyBanner" style="display: none;" class="bg-red-950/40 border-b border-red-900/50 px-4 py-3 fade-in">
-      <div class="max-w-5xl mx-auto flex items-center justify-between gap-4">
-        <div class="text-xs sm:text-sm text-red-200">
-          ❤️ <strong>Support is available:</strong> If you are feeling overwhelmed or having difficult thoughts, you can reach India's Tele-MANAS helpline at <strong>14416</strong> or Kiran at <strong>1800-599-0019</strong> (24/7, Toll-Free). You are not alone.
-        </div>
-        <button onclick="document.getElementById('safetyBanner').style.display='none'" class="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1">
-          Dismiss
-        </button>
-      </div>
-    </div>
-
     <!-- Chat Container -->
-    <div class="flex-1 overflow-hidden flex flex-col max-w-5xl w-full mx-auto">
-      <div id="chatWrapper" class="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
-        <div id="chat" class="flex flex-col gap-4 max-w-4xl mx-auto pb-4"></div>
+    <div class="flex-1 overflow-hidden flex flex-col w-full">
+      <div id="chatWrapper" class="flex-1 overflow-y-auto px-6 md:px-12 py-8 custom-scrollbar">
+        <div id="chat" class="flex flex-col gap-6 max-w-3xl mx-auto pb-8"></div>
       </div>
     </div>
 
     <!-- Fixed Bottom Controls -->
-    <div class="bg-slate-800/50 backdrop-blur-sm border-t border-slate-700/50 sticky bottom-0">
-      <div class="max-w-5xl mx-auto px-4 py-4">
+    <div class="bg-paper border-t border-ink sticky bottom-0">
+      <div class="w-full px-6 md:px-12 mx-auto py-4">
         <!-- Input Mode Toggle -->
-        <div class="flex justify-center gap-2 mb-3">
-          <button 
-            id="voiceModeBtn" 
-            class="px-4 py-1.5 bg-blue-600 text-white rounded-full text-xs font-medium transition-all"
-          >
-            🎙️ Voice
-          </button>
-          <button 
-            id="textModeBtn" 
-            class="px-4 py-1.5 bg-slate-700/50 text-slate-400 rounded-full text-xs font-medium transition-all"
-          >
-            💬 Text
-          </button>
+        <div class="flex justify-center gap-4 mb-4">
+          <button id="textModeBtn" class="btn-toggle active uppercase tracking-wider text-xs">Text</button>
+          <button id="voiceModeBtn" class="btn-toggle uppercase tracking-wider text-xs">Audio</button>
         </div>
 
         <!-- Voice Input -->
-        <div id="voiceInput" class="flex flex-col items-center gap-3">
+        <div id="voiceInput" class="hidden flex-col items-center gap-3">
           <button 
             id="micBtn" 
-            class="relative w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-500/50 transition-all duration-200 flex items-center justify-center group"
+            class="w-14 h-14 border border-ink rounded-full flex items-center justify-center transition-all duration-200 hover:bg-moss hover:border-moss hover:text-paper group text-ink"
           >
-            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
             </svg>
           </button>
-          <p id="status" class="text-sm text-slate-400 font-medium">Tap the microphone to speak</p>
+          <p id="status" class="text-xs font-utility text-clay uppercase tracking-widest">Ready</p>
         </div>
 
         <!-- Text Input -->
-        <div id="textInput" style="display: none;">
+        <div id="textInput" class="block">
           <div class="chat-input-container max-w-3xl mx-auto">
             <input 
               type="text" 
               id="chatInput" 
               class="chat-input" 
-              placeholder="Type your message here..."
+              placeholder="Enter message..."
               autocomplete="off"
             />
-            <button id="sendBtn" class="send-btn">
-              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-              </svg>
+            <button id="sendBtn" class="px-4 py-2 bg-ink text-paper text-sm font-utility uppercase transition-colors hover:bg-moss">
+              Submit
             </button>
           </div>
         </div>
