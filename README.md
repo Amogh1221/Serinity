@@ -2,7 +2,9 @@
 
 An intelligent, **production-ready** psychiatric assessment system powered by Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). Dr. Aiden conducts empathetic clinical interviews, analyzes conversation patterns, and provides evidence-based psychological insights grounded in clinical psychopathology literature.
 
-This project has been fully migrated to a **local, on-device architecture** to prioritize patient privacy, eliminate cloud latency, and remove API dependencies.
+> **OSDHack 2026 Submission:** This project has been explicitly engineered for the **On Device AI** theme. The entire AI stack—Speech-to-Text, Conversational LLM, Pattern Analysis LLM, and Vector Database—runs 100% locally on the device. No cloud AI APIs are used.
+
+This project prioritizes patient privacy, eliminates cloud latency, and provides completely offline, intelligent mental health care.
 
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
@@ -174,7 +176,7 @@ MEMORY_DB_PATH=./data/serinity.db
 4. **Initialize the Vector Database:**
    (Ensure you run this once before starting the server to populate ChromaDB)
    ```bash
-   python built_vectorDB.py
+   python scripts/build_vector_db.py
    ```
 
 5. **Start the FastAPI server:**
