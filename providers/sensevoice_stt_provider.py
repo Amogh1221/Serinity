@@ -43,7 +43,6 @@ class SenseVoiceSTTProvider:
 
     def _init_stt(self):
         try:
-            print("[STARTUP] Loading SenseVoice-Small (STT + emotion engine)...")
             from funasr import AutoModel
             from funasr.utils.postprocess_utils import rich_transcription_postprocess
 

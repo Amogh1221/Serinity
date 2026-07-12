@@ -41,7 +41,15 @@ This project strictly adheres to the **On Device AI** theme. **The entire AI sta
 * [Link to Demo Video](#) *(Insert YouTube/Vimeo link here)*
 
 ### Screenshots
-*(Insert screenshots here showcasing the UI, dashboard, and terminal logs)*
+
+#### 1. Conversational Interface (phi4-mini)
+![Chat UI](icons/conversation.png)
+
+#### 2. Clinical History & Patient Profile (qwen2.5:7b-instruct)
+![Patient Profile](icons/profile.png)
+
+#### 3. Local Inference Logs (100% On-Device)
+![Terminal Logs](icons/terminal.png)
 
 ---
 

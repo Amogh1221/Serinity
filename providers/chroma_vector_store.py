@@ -25,8 +25,6 @@ class ChromaVectorStore:
                 "[RAG WARNING] ChromaDB collection is empty. "
                 "Run `python built_vectorDB.py` to populate it before starting a session."
             )
-        else:
-            print(f"[RAG] Loaded {count:,} documents from ChromaDB ({collection_name}).")
 
     def retrieve(self, query: str) -> str:
         if not query or not query.strip():

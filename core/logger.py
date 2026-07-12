@@ -61,9 +61,7 @@ class DebugLogger:
 
         self._write_jsonl("session_start", {"session_id": session_id})
 
-    # ------------------------------------------------------------------
     # Public logging methods
-    # ------------------------------------------------------------------
 
     def session_start(self, patient_id: str | None):
         self._write_jsonl("session_start", {"patient_id": patient_id})
@@ -150,19 +148,15 @@ class DebugLogger:
             self._write_jsonl("session_end", {"session_id": self.session_id})
             self._jsonl.close()
 
-    # ------------------------------------------------------------------
     # Internal helpers
-    # ------------------------------------------------------------------
 
     def _write_jsonl(self, event: str, data: dict):
         record = {"ts": _now(), "event": event, **data}
         self._jsonl.write(json.dumps(record, ensure_ascii=False) + "\n")
         self._jsonl.flush()
 
-
-# ---------------------------------------------------------------------------
 # Convenience: session-keyed registry so main.py can look up loggers by session
-# ---------------------------------------------------------------------------
+
 _active_loggers: dict[str, DebugLogger] = {}
 
 
