@@ -76,7 +76,7 @@
       <div class="space-y-4">
         <details class="group border border-ink bg-paper p-4 cursor-pointer open:pb-4">
           <summary class="block text-xs font-utility text-ink uppercase tracking-wider select-none outline-none">
-            + Create New Profile
+            <span class="group-open:hidden">+</span><span class="hidden group-open:inline">-</span> Create New Profile
           </summary>
           <div class="space-y-3 mt-4 cursor-default" onclick="event.stopPropagation()">
             <div>
@@ -87,7 +87,7 @@
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-utility text-clay uppercase mb-1">Age</label>
-                <input type="number" id="newPatientAge" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="e.g. 34">
+                <input type="number" id="newPatientAge" min="5" max="100" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="e.g. 34">
               </div>
               <div>
                 <label class="block text-xs font-utility text-clay uppercase mb-1">Gender</label>
@@ -95,7 +95,6 @@
                   <option value="">Select</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
-                  <option value="Non-binary">Non-binary</option>
                   <option value="Other">Other</option>
                 </select>
               </div>

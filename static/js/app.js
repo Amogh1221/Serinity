@@ -273,17 +273,27 @@ function bindEvents() {
     const concernInput = document.getElementById("newPatientConcern");
     
     const name = nameInput.value.trim();
-    if (!name) {
-      alert("Please enter a name for the new profile.");
+    const age = ageInput.value;
+    const gender = genderInput ? genderInput.value : null;
+    const occupation = occupationInput ? occupationInput.value.trim() : null;
+
+    if (!name || !age || !gender || !occupation) {
+      alert("Please fill out all 4 required fields (Name, Age, Gender, and Occupation) to create a new profile.");
+      return;
+    }
+    
+    const parsedAge = parseInt(age);
+    if (isNaN(parsedAge) || parsedAge < 5 || parsedAge > 100) {
+      alert("Age must be between 5 and 100.");
       return;
     }
 
     try {
       const data = {
         name: name,
-        age: ageInput.value ? parseInt(ageInput.value) : null,
-        gender: genderInput ? genderInput.value : null,
-        occupation: occupationInput ? occupationInput.value.trim() : null,
+        age: parseInt(age),
+        gender: gender,
+        occupation: occupation,
         primary_concern: concernInput ? concernInput.value.trim() : null
       };
       const pData = await api.createPatientProfile(data);
