@@ -59,6 +59,16 @@ class PatientService:
         return session_id, llm1_response.assistant_message, resolved_patient_id
 
     def end_session(self, session_id: str, default_patient_id: Optional[str] = None) -> None:
+        """
+        Synchronously ends the session.
+        Immediate teardown logic goes here.
+        """
+        pass
+
+    def generate_session_summary(self, session_id: str, default_patient_id: Optional[str] = None) -> None:
+        """
+        Asynchronously generates and saves a clinical summary of the session.
+        """
         patient_id = self.profile_store.get_patient_id(session_id) or default_patient_id
 
         history = self.session_store.get_working_context(session_id)

@@ -71,10 +71,12 @@ def patient_dashboard(
 @router.post("/end_session")
 def end_session_endpoint(
     request: EndSessionRequest, 
+    background_tasks: BackgroundTasks,
     patient_service: PatientService = Depends(get_patient_service)
 ):
-    """Gracefully terminate an active session and generate a clinical summary."""
+    """Gracefully terminate an active session and generate a clinical summary in the background."""
     patient_service.end_session(request.session_id, request.patient_id)
+    background_tasks.add_task(patient_service.generate_session_summary, request.session_id, request.patient_id)
     return {"status": "ended"}
 
 @router.post("/start")
