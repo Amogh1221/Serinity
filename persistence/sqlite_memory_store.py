@@ -80,6 +80,11 @@ class SQLiteMemoryStore:
                 conn.execute("ALTER TABLE patients ADD COLUMN primary_concern TEXT")
             except sqlite3.OperationalError:
                 pass # Columns already exist
+                
+            try:
+                conn.execute("ALTER TABLE sessions ADD COLUMN summarized_msg_count INTEGER DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass # Column already exists
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
@@ -324,18 +329,20 @@ class SQLiteMemoryStore:
             ).fetchall()
         return [{"role": r["role"], "content": r["content"]} for r in rows]
 
-    def _get_rolling_summary(self, session_id: str) -> str:
+    def _get_rolling_summary(self, session_id: str) -> tuple[str, int]:
         with self._get_conn() as conn:
             row = conn.execute(
-                "SELECT rolling_summary FROM sessions WHERE session_id=?", (session_id,)
+                "SELECT rolling_summary, summarized_msg_count FROM sessions WHERE session_id=?", (session_id,)
             ).fetchone()
-        return (row["rolling_summary"] or "") if row else ""
+        if not row:
+            return "", 0
+        return (row["rolling_summary"] or ""), (row["summarized_msg_count"] or 0)
 
-    def _set_rolling_summary(self, session_id: str, summary: str):
+    def _set_rolling_summary(self, session_id: str, summary: str, count: int):
         with self._get_conn() as conn:
             conn.execute(
-                "UPDATE sessions SET rolling_summary=? WHERE session_id=?",
-                (summary, session_id),
+                "UPDATE sessions SET rolling_summary=?, summarized_msg_count=? WHERE session_id=?",
+                (summary, count, session_id),
             )
 
     def get_working_context(self, session_id: str, llm_engine: Optional[LLMProvider] = None) -> list:
@@ -346,10 +353,18 @@ class SQLiteMemoryStore:
         overflow = all_msgs[:-self.working_memory_turns]
         tail     = all_msgs[-self.working_memory_turns:]
 
-        summary = self._get_rolling_summary(session_id)
-        if not summary and llm_engine is not None:
-            summary = llm_engine.summarize_history(overflow)
-            self._set_rolling_summary(session_id, summary)
+        summary, summarized_count = self._get_rolling_summary(session_id)
+        
+        if len(overflow) > summarized_count and llm_engine is not None:
+            new_overflow = overflow[summarized_count:]
+            
+            if summary:
+                turns_to_summarize = [{"role": "system", "content": f"Previous summary: {summary}"}] + new_overflow
+            else:
+                turns_to_summarize = new_overflow
+                
+            summary = llm_engine.summarize_history(turns_to_summarize)
+            self._set_rolling_summary(session_id, summary, len(overflow))
 
         context = []
         if summary:
