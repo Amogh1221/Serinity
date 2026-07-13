@@ -149,10 +149,18 @@
       </div>
 
       <!-- Footer -->
-      <div class="mt-8 pt-6 border-t border-ink/30 shrink-0">
+      <div class="mt-8 pt-6 border-t border-ink/30 shrink-0 flex flex-wrap justify-between items-center gap-4">
         <button class="text-xs font-utility tracking-widest text-clay hover:text-ink uppercase transition flex items-center gap-2" id="dashboardBackBtn">
           <span>&larr;</span> CLOSE FILE
         </button>
+        <div class="flex gap-4">
+          <button class="text-xs font-utility tracking-widest text-signal border border-signal hover:bg-signal hover:text-paper uppercase transition px-4 py-2 flex items-center gap-2" id="dashboardResetBtn">
+            RESET PROFILE
+          </button>
+          <button class="text-xs font-utility tracking-widest text-paper bg-signal hover:bg-signal/90 uppercase transition px-4 py-2 flex items-center gap-2" id="dashboardDeleteBtn">
+            DELETE PROFILE
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -210,7 +218,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
             </svg>
           </button>
-          <p id="status" class="text-xs font-utility text-clay uppercase tracking-widest">Ready</p>
+          <p id="status" class="text-xs font-utility text-clay uppercase tracking-widest">Tap mic or hold Space</p>
         </div>
 
         <!-- Text Input -->
@@ -232,6 +240,23 @@
     </div>
   </div>
 
-  <script src="/static/js/app.js"></script>
+  <!-- Confirmation Modal -->
+  <div id="confirmationModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-[60] flex flex-col items-center justify-center p-4 fade-in">
+    <div class="bg-paper border border-signal p-8 max-w-sm w-full shadow-lg">
+      <h2 class="text-xl font-display text-signal mb-2" id="confirmModalTitle">Are you sure?</h2>
+      <p class="text-clay text-sm mb-6" id="confirmModalText">This action cannot be undone.</p>
+      
+      <div class="flex gap-4">
+        <button id="confirmModalCancelBtn" class="flex-1 bg-transparent border border-ink text-ink hover:bg-ink hover:text-paper transition py-2 font-utility uppercase tracking-widest text-sm">
+          CANCEL
+        </button>
+        <button id="confirmModalConfirmBtn" class="flex-1 bg-signal text-paper hover:bg-signal/80 transition py-2 font-utility uppercase tracking-widest text-sm">
+          CONFIRM
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js?v=2"></script>
 </body>
 </html>

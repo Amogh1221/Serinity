@@ -133,13 +133,13 @@ class SQLiteMemoryStore:
     def update_patient_profile(self, patient_id: str, llm2_output: LLM2Output) -> None:
         profile = self.get_patient_profile(patient_id)
 
-        LIST_FIELDS = [
-            "emotional_themes", "thinking_patterns", "behavioral_patterns",
-            "interpersonal_dynamics", "stressors", "unclear_areas",
-            "protective_factors",
+        # Dynamically process all list-based fields to adhere to OCP
+        list_fields = [
+            field for field, field_info in LLM2Output.model_fields.items()
+            if field != "risk_assessment"
         ]
 
-        for field in LIST_FIELDS:
+        for field in list_fields:
             existing = profile.get(field, [])
             new_items = getattr(llm2_output, field, [])
             existing_lower = {x.lower() for x in existing}
@@ -202,6 +202,24 @@ class SQLiteMemoryStore:
             ).fetchone()
         return row["patient_id"] if row else None
 
+    def reset_patient_data(self, patient_id: str) -> None:
+        with self._get_conn() as conn:
+            conn.execute("DELETE FROM analysis_jobs WHERE patient_id = ?", (patient_id,))
+            conn.execute("DELETE FROM messages WHERE session_id IN (SELECT session_id FROM sessions WHERE patient_id = ?)", (patient_id,))
+            conn.execute("DELETE FROM sessions WHERE patient_id = ?", (patient_id,))
+            conn.execute(
+                "UPDATE patient_profile SET profile_json = '{}', updated_at = ? WHERE patient_id = ?",
+                (self._now(), patient_id)
+            )
+
+    def delete_patient(self, patient_id: str) -> None:
+        with self._get_conn() as conn:
+            conn.execute("DELETE FROM analysis_jobs WHERE patient_id = ?", (patient_id,))
+            conn.execute("DELETE FROM messages WHERE session_id IN (SELECT session_id FROM sessions WHERE patient_id = ?)", (patient_id,))
+            conn.execute("DELETE FROM sessions WHERE patient_id = ?", (patient_id,))
+            conn.execute("DELETE FROM patient_profile WHERE patient_id = ?", (patient_id,))
+            conn.execute("DELETE FROM patients WHERE patient_id = ?", (patient_id,))
+
 
     # --- SessionStore Implementation ---
 
@@ -227,6 +245,13 @@ class SQLiteMemoryStore:
                 (session_id, patient_id, now, now),
             )
         return session_id
+
+    def end_session(self, session_id: str) -> None:
+        with self._get_conn() as conn:
+            conn.execute(
+                "UPDATE sessions SET last_active_at=? WHERE session_id=?",
+                (self._now(), session_id),
+            )
         
     # --- Background Job Management ---
     def queue_analysis_job(self, session_id: str, patient_id: str) -> str:

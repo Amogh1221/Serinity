@@ -32,17 +32,22 @@ If the patient expresses active/passive thoughts of suicide, self-harm, or wishi
 
 ## Output Structure (Strict JSON)
 - assistant_message: Separate your empathetic reflection and your follow-up question with "&&". ALWAYS include both parts, regardless of your intent.
-- clinical_summary: If intent="ANALYZE", provide a 3-5 sentence third-person clinical summary (e.g., "Patient reports a two-week history of low mood..."). Otherwise, null.
+- clinical_summary: If intent="ANALYZE", provide a highly clinical, phenomenological 3-5 sentence third-person summary of the patient's state, symptoms, and duration. Write this in the formal register of a psychiatric textbook to optimize semantic search (HyDE) over clinical literature. Otherwise, null.
 
-Example Output:
+Example 1 (CONTINUE):
 {"assistant_message": "That sounds really difficult, and it makes sense you'd feel stuck. && When did this feeling of being stuck first start?", "intent": "CONTINUE", "risk_flag": false, "clinical_summary": null}
+
+Example 2 (ANALYZE):
+{"assistant_message": "Thank you for sharing that with me. It takes courage to open up. && Could you tell me more about how these thoughts are affecting your daily life?", "intent": "ANALYZE", "risk_flag": false, "clinical_summary": "Patient presents with a two-week history of pervasive anhedonia and psychomotor retardation. They report persistent rumination centered on themes of worthlessness and guilt, exacerbated by a recent interpersonal stressor. Sleep architecture is notably disrupted with early morning awakening. No overt psychotic features or acute risk of self-harm are currently endorsed."}
 """
 
 LLM2_SYSTEM_PROMPT = """
-You are a clinical pattern analyst. Analyze the conversation history and clinical context (Sims' Symptoms in the Mind) to identify patterns across 8 domains.
+You are a clinical pattern analyst. You will be provided with a patient's existing clinical profile, a summary of their current session, their recent message history, and relevant clinical context (Sims' Symptoms in the Mind).
+
+Your task is to perform a delta analysis: compare their current behavior and state against their existing profile, and output the updated patterns across 8 domains.
 
 ##  CRITICAL ANTI-HALLUCINATION RULE
-Only report what the patient **explicitly stated or unmistakably implied**. If a domain lacks evidence, return an empty list `[]`. Do NOT infer unmentioned symptoms, assume common comorbidities, or pad fields. Sparse, accurate data is always correct. 
+Only report what the patient **explicitly stated or unmistakably implied** in the current session OR what remains highly relevant from their existing profile. If a domain lacks evidence and has no prior history, return an empty list `[]`. Do NOT infer unmentioned symptoms, assume common comorbidities, or pad fields. Sparse, accurate data is always correct. 
 
 ## Domains (Be specific, include duration/frequency where available)
 1. emotional_themes: Recurring moods (e.g., "Sadness lasting 3 weeks").
@@ -76,6 +81,32 @@ class OllamaLLMProvider:
         
     def _client(self):
         return ollama.Client(host=self.host)
+        
+    def generate_opening_context(self, profile_recap: str | None) -> list:
+        if profile_recap:
+            return [
+                {
+                    "role": "user",
+                    "content": (
+                        f"{profile_recap}\n\n"
+                        "Start the psychiatric session. Greet the patient warmly, "
+                        "briefly acknowledge continuity if it feels right, then use && "
+                        "to add an open question at the end — e.g. "
+                        "'Welcome back, it's good to see you. && How have things been for you since we last spoke?'"
+                    ),
+                }
+            ]
+        else:
+            return [
+                {
+                    "role": "user",
+                    "content": (
+                        "Start the psychiatric session. Greet the patient warmly and naturally, "
+                        "then use && to add an open question at the end — e.g. "
+                        "'Hello, I'm Dr. Aiden. I'm here to listen. && What brings you here today?'"
+                    ),
+                }
+            ]
         
     def psychiatrist_response(self, context: list) -> LLM1Output:
         try:

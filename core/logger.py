@@ -128,12 +128,13 @@ class DebugLogger:
             "message": llm1_output.assistant_message,
         })
 
-    def assistant_reply(self, message: str, risk_injected: bool):
+    def assistant_reply(self, message: str, risk_injected: bool, latency_ms: int = 0):
         """Log the final message sent back to the user."""
         self._write_jsonl("assistant_reply", {
             "turn":           self._turn,
             "message":        message,
             "risk_injected":  risk_injected,
+            "latency_ms":     latency_ms,
         })
 
     def error(self, context: str, exc: Exception):

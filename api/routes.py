@@ -68,6 +68,26 @@ def patient_dashboard(
         "sessions": sessions
     }
 
+@router.post("/patients/{patient_id}/reset")
+def reset_patient_data(
+    patient_id: str,
+    background_tasks: BackgroundTasks,
+    patient_service: PatientService = Depends(get_patient_service)
+):
+    """Reset the patient's data, including sessions, messages, and profile."""
+    background_tasks.add_task(patient_service.reset_patient_data, patient_id)
+    return {"status": "accepted", "message": "Patient data reset initiated in background."}
+
+@router.delete("/patients/{patient_id}")
+def delete_patient(
+    patient_id: str,
+    background_tasks: BackgroundTasks,
+    patient_service: PatientService = Depends(get_patient_service)
+):
+    """Delete a patient and all their associated data completely."""
+    background_tasks.add_task(patient_service.delete_patient, patient_id)
+    return {"status": "accepted", "message": "Patient deletion initiated in background."}
+
 @router.post("/end_session")
 def end_session_endpoint(
     request: EndSessionRequest, 
@@ -92,18 +112,7 @@ def start_session(
         "patient_id":        patient_id,
     }
 
-@router.post("/reset")
-def reset_session(
-    request: ResetRequest, 
-    patient_service: PatientService = Depends(get_patient_service)
-):
-    """Reset the current session history and start fresh with a new opening remark."""
-    session_id, opening_message, patient_id = patient_service.create_new_session(request.patient_id)
-    return {
-        "assistant_message": opening_message,
-        "session_id":        session_id,
-        "patient_id":        patient_id,
-    }
+
 
 @router.post("/chat_text")
 def chat_text(
@@ -142,7 +151,8 @@ def chat_text(
                 orchestrator.run_background_analysis,
                 chat_result.job_id,
                 request.session_id,
-                patient_id
+                patient_id,
+                chat_result.clinical_summary
             )
 
     return {

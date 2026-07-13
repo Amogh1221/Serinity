@@ -20,3 +20,5 @@ pyttsx3
 numpy
 num2words
 spacy
+rank_bm25
+langchain.retrievers

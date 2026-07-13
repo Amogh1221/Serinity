@@ -1,3 +1,4 @@
+import time
 from typing import Optional
 from core.ports import LLMProvider, VectorStore, SessionStore, ProfileStore, AnalysisJobStore, LLM1Output
 from core.schemas import ChatResult
@@ -32,6 +33,8 @@ class ConversationOrchestrator:
         return "\n  • " + "\n  • ".join(items)
 
     def handle_message(self, session_id: str, message: str, emotion: Optional[str], default_patient_id: Optional[str]) -> ChatResult:
+        start_time = time.time()
+        
         patient_id = self.profile_store.get_patient_id(session_id) or default_patient_id
         patient_info = self.profile_store.get_patient(patient_id) if patient_id else None
         user_name = patient_info.get("name", "Guest Patient") if patient_info else "Guest Patient"
@@ -59,13 +62,15 @@ class ConversationOrchestrator:
             intent = "ANALYZE"
             
         self.session_store.append_message(session_id, "assistant", llm1_response.assistant_message)
-        log.assistant_reply(llm1_response.assistant_message, risk_injected=base_risk)
+        latency_ms = int((time.time() - start_time) * 1000)
+        log.assistant_reply(llm1_response.assistant_message, risk_injected=base_risk, latency_ms=latency_ms)
         
         chat_result = ChatResult(
             assistant_message=llm1_response.assistant_message,
             intent=intent,
             risk_flagged=base_risk,
-            job_id=None
+            job_id=None,
+            clinical_summary=llm1_response.clinical_summary
         )
         
         if intent == "ANALYZE" and patient_id:
@@ -74,7 +79,7 @@ class ConversationOrchestrator:
             
         return chat_result
 
-    def run_background_analysis(self, job_id: str, session_id: str, patient_id: str):
+    def run_background_analysis(self, job_id: str, session_id: str, patient_id: str, clinical_summary: Optional[str] = None):
         """
         Executes the heavy LLM2 pattern analysis asynchronously.
         Uses the AnalysisJobStore to ensure only one analysis runs per patient at a time.
@@ -86,23 +91,37 @@ class ConversationOrchestrator:
         log = get_logger(session_id, "Background Task")
         try:
             history = self.session_store.get_working_context(session_id, llm_engine=self.llm_provider)
-            retrieval_query = "\n".join(
-                msg["content"]
-                for msg in history[-10:]
-                if msg.get("role") == "user"
-            )
-            query_source = "user_messages_fallback"
+            if clinical_summary and clinical_summary.strip():
+                retrieval_query = clinical_summary
+                query_source = "clinical_summary"
+            else:
+                retrieval_query = "\n".join(
+                    msg["content"]
+                    for msg in history[-10:]
+                    if msg.get("role") == "user"
+                )
+                query_source = "user_messages_fallback"
             
             log.analyze_triggered(retrieval_query, query_source)
             retrieved_context = self.vector_store.retrieve(retrieval_query)
             log.retrieved_context(retrieved_context)
             
+            existing_profile_recap = self.profile_store.build_profile_recap(patient_id) or "No previous clinical profile exists for this patient."
+            
+            context_prompt = (
+                f"Existing Clinical Profile:\n{existing_profile_recap}\n\n"
+            )
+            if clinical_summary and clinical_summary.strip():
+                context_prompt += f"Current Session Clinical Summary:\n{clinical_summary}\n\n"
+                
+            context_prompt += (
+                f"Retrieved Clinical Reference (Sims' Symptoms in the Mind):\n{retrieved_context}\n\n"
+                "Please perform pattern analysis across all eight domains. Evaluate how the user is behaving now (based on the current session messages and summary) compared to their existing profile, and output the updated patterns."
+            )
+            
             llm2_input = history[-10:] + [{
                 "role": "user",
-                "content": (
-                    f"Clinical Context for Analysis:\n{retrieved_context}\n\n"
-                    "Please perform pattern analysis across all eight domains."
-                )
+                "content": context_prompt
             }]
             llm2_response = self.llm_provider.internal_reasoning(llm2_input)
             log.llm2_output(llm2_response)

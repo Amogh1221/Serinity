@@ -6,6 +6,7 @@ let sessionId = null;
 let patientId = localStorage.getItem("serinity_patient_id") || null;
 let isListening = false;
 let isVoiceMode = false; // Default to text mode per clinical feel
+let isAISpeaking = false; // Global lock to prevent interrupting AI
 let mediaRecorder;
 let audioChunks = [];
 
@@ -23,6 +24,35 @@ const mainApp = document.getElementById("mainApp");
 const startButton = document.getElementById("startButton");
 const profileSelectionScreen = document.getElementById("profileSelectionScreen");
 const dashboardScreen = document.getElementById("dashboardScreen");
+
+// Screen Routing
+const screens = ["loadingScreen", "profileSelectionScreen", "dashboardScreen", "mainApp"];
+
+function switchScreen(targetScreen, pushToHistory = true) {
+  screens.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) {
+      if (s === targetScreen) {
+        if (s === 'mainApp' || s === 'dashboardScreen') el.classList.remove("hidden");
+        el.style.display = "flex";
+      } else {
+        el.style.display = "none";
+      }
+    }
+  });
+
+  if (pushToHistory) {
+    history.pushState({ screen: targetScreen }, "", `/#${targetScreen}`);
+  }
+}
+
+window.addEventListener("popstate", (event) => {
+  if (event.state && event.state.screen) {
+    switchScreen(event.state.screen, false);
+  } else {
+    switchScreen("loadingScreen", false);
+  }
+});
 
 // Mode toggle elements
 const voiceModeBtn = document.getElementById("voiceModeBtn");
@@ -136,9 +166,7 @@ function removeTyping() {
   typingNode = null;
 }
 
-function clearChat() {
-  chat.innerHTML = "";
-}
+
 
 const voiceSelect = document.getElementById("voiceSelect");
 let systemVoices = [];
@@ -219,17 +247,20 @@ function speak(text) {
     utterance.pitch = 1.0;
 
     utterance.onstart = () => {
+      isAISpeaking = true;
       statusText.textContent = "Assistant is speaking...";
     };
 
     utterance.onend = () => {
-      statusText.textContent = "Tap the microphone to speak";
+      isAISpeaking = false;
+      statusText.textContent = "Tap the microphone or hold Space to speak";
       resolve();
     };
 
     utterance.onerror = (e) => {
+      isAISpeaking = false;
       console.error("Browser TTS Error:", e);
-      statusText.textContent = "Tap the microphone to speak";
+      statusText.textContent = "Tap the microphone or hold Space to speak";
       resolve();
     };
 
@@ -238,7 +269,10 @@ function speak(text) {
     // Safety fallback: if utterance.onend doesn't fire, resolve after a calculation
     const wordCount = text.split(/\s+/).length;
     const timeoutMs = Math.max(3000, wordCount * 600);
-    setTimeout(resolve, timeoutMs);
+    setTimeout(() => {
+      isAISpeaking = false;
+      resolve();
+    }, timeoutMs);
   });
 }
 
@@ -343,9 +377,7 @@ async function showDashboard(pId) {
       }
     }
     
-    profileSelectionScreen.style.display = "none";
-    loadingScreen.style.display = "none";
-    dashboardScreen.style.display = "flex";
+    switchScreen("dashboardScreen");
     
   } catch (err) {
     console.error("Dashboard error", err);
@@ -354,14 +386,78 @@ async function showDashboard(pId) {
 }
 
 document.getElementById("dashboardBackBtn").onclick = () => {
-  dashboardScreen.style.display = "none";
-  profileSelectionScreen.style.display = "flex";
+  switchScreen("profileSelectionScreen");
   fetchPatients();
 };
 
+// Custom Confirmation Modal Logic
+const confirmationModal = document.getElementById("confirmationModal");
+const confirmModalTitle = document.getElementById("confirmModalTitle");
+const confirmModalText = document.getElementById("confirmModalText");
+const confirmModalCancelBtn = document.getElementById("confirmModalCancelBtn");
+const confirmModalConfirmBtn = document.getElementById("confirmModalConfirmBtn");
+
+let currentConfirmCallback = null;
+
+function showConfirm(title, text, callback) {
+  confirmModalTitle.textContent = title;
+  confirmModalText.textContent = text;
+  currentConfirmCallback = callback;
+  confirmationModal.style.display = "flex";
+}
+
+confirmModalCancelBtn.onclick = () => {
+  confirmationModal.style.display = "none";
+  currentConfirmCallback = null;
+};
+
+confirmModalConfirmBtn.onclick = () => {
+  confirmationModal.style.display = "none";
+  if (currentConfirmCallback) {
+    currentConfirmCallback();
+  }
+};
+
+document.getElementById("dashboardResetBtn").onclick = () => {
+  showConfirm(
+    "Reset Profile?",
+    "Are you sure you want to reset this profile? All sessions, messages, and analysis will be permanently deleted. The patient record will remain.",
+    () => {
+      // 1. Clear UI immediately
+      document.getElementById("dashboardSessionsList").innerHTML = `<p class="text-clay text-sm italic">No previous sessions found.</p>`;
+      document.getElementById("dashboardDomains").innerHTML = `
+        <h3 class="font-utility uppercase text-clay text-sm border-b border-ink/30 pb-2">Clinical Profile</h3>
+        <p class="text-clay text-sm italic mt-4">Profile has been reset.</p>
+      `;
+
+      // 2. Trigger background process on backend
+      fetch(`${BACKEND_URL}/patients/${patientId}/reset`, { method: "POST" })
+        .catch(e => console.error("Error resetting profile:", e));
+    }
+  );
+};
+
+document.getElementById("dashboardDeleteBtn").onclick = () => {
+  showConfirm(
+    "Delete Profile?",
+    "Are you sure you want to completely delete this profile? This action is irreversible and all data will be erased.",
+    () => {
+      // 1. Redirect immediately
+      const idToDelete = patientId;
+      localStorage.removeItem("serinity_patient_id");
+      patientId = null;
+      switchScreen("profileSelectionScreen");
+      fetchPatients();
+
+      // 2. Trigger background process on backend
+      fetch(`${BACKEND_URL}/patients/${idToDelete}`, { method: "DELETE" })
+        .catch(e => console.error("Error deleting profile:", e));
+    }
+  );
+};
+
 document.getElementById("dashboardStartBtn").onclick = async () => {
-  dashboardScreen.style.display = "none";
-  loadingScreen.style.display = "flex";
+  switchScreen("loadingScreen");
   startButton.textContent = "Loading Session...";
   startButton.disabled = true;
   await startActualSession(patientId);
@@ -452,9 +548,7 @@ async function startActualSession(pId) {
     patientId = data.patient_id;
 
     // Immediately load the chat interface
-    loadingScreen.classList.add("hidden");
-    loadingScreen.style.display = "none";
-    mainApp.style.display = "flex";
+    switchScreen("mainApp");
 
     // Setup session stats
     sessionStartTime = Date.now();
@@ -476,8 +570,7 @@ async function startActualSession(pId) {
 startButton.onclick = () => {
   if (startButton.textContent === "Start Consultation") {
     // Hide welcome front page, show profile dialog
-    loadingScreen.style.display = "none";
-    profileSelectionScreen.style.display = "flex";
+    switchScreen("profileSelectionScreen");
     fetchPatients();
   } else if (startButton.textContent === "Retry Connection") {
     startButton.textContent = "Initializing...";
@@ -546,6 +639,11 @@ async function sendTextMessage(message, emotion = null) {
           </div>
         `;
         document.body.appendChild(banner);
+      }
+    } else {
+      const banner = document.getElementById("safetyBanner");
+      if (banner) {
+        banner.remove();
       }
     }
   } catch (err) {
@@ -628,6 +726,8 @@ function stopRecording() {
 }
 
 micBtn.onclick = () => {
+  if (isAISpeaking) return;
+  
   if (!isListening) {
     startRecording();
   } else {
@@ -635,6 +735,20 @@ micBtn.onclick = () => {
   }
 };
 
+// Spacebar Hold-to-Speak
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && !e.repeat && isVoiceMode && !isListening && !isAISpeaking && document.activeElement !== chatInput) {
+    e.preventDefault();
+    startRecording();
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space' && isListening) {
+    e.preventDefault();
+    stopRecording();
+  }
+});
 // End Session Explicitly
 document.getElementById("endSessionBtn").onclick = async () => {
   if (!sessionId) return;

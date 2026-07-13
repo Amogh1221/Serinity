@@ -12,39 +12,12 @@ class PatientService:
         self.session_store = session_store
         self.llm_provider = llm_provider
 
-    def _build_opening_context(self, patient_id: Optional[str]) -> list:
-        recap = self.profile_store.build_profile_recap(patient_id) if patient_id else None
-
-        if recap:
-            return [
-                {
-                    "role": "user",
-                    "content": (
-                        f"{recap}\n\n"
-                        "Start the psychiatric session. Greet the patient warmly, "
-                        "briefly acknowledge continuity if it feels right, then use && "
-                        "to add an open question at the end — e.g. "
-                        "'Welcome back, it's good to see you. && How have things been for you since we last spoke?'"
-                    ),
-                }
-            ]
-        else:
-            return [
-                {
-                    "role": "user",
-                    "content": (
-                        "Start the psychiatric session. Greet the patient warmly and naturally, "
-                        "then use && to add an open question at the end — e.g. "
-                        "'Hello, I'm Dr. Aiden. I'm here to listen. && What brings you here today?'"
-                    ),
-                }
-            ]
-
     def create_new_session(self, default_patient_id: Optional[str] = None) -> Tuple[str, str, str]:
         session_id = self.session_store.create_session(patient_id=default_patient_id)
         resolved_patient_id = self.profile_store.get_patient_id(session_id)
 
-        opening_context = self._build_opening_context(resolved_patient_id)
+        recap = self.profile_store.build_profile_recap(resolved_patient_id) if resolved_patient_id else None
+        opening_context = self.llm_provider.generate_opening_context(recap)
         llm1_response   = self.llm_provider.psychiatrist_response(opening_context)
 
         self.session_store.append_message(session_id, "assistant", llm1_response.assistant_message)
@@ -63,7 +36,19 @@ class PatientService:
         Synchronously ends the session.
         Immediate teardown logic goes here.
         """
-        pass
+        self.session_store.end_session(session_id)
+
+    def reset_patient_data(self, patient_id: str) -> None:
+        """
+        Resets the patient's data, including sessions, messages, and profile.
+        """
+        self.profile_store.reset_patient_data(patient_id)
+
+    def delete_patient(self, patient_id: str) -> None:
+        """
+        Deletes a patient and all their associated data completely.
+        """
+        self.profile_store.delete_patient(patient_id)
 
     def generate_session_summary(self, session_id: str, default_patient_id: Optional[str] = None) -> None:
         """

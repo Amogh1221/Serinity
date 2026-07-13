@@ -39,6 +39,10 @@ class LLMProvider(Protocol):
     Protocol defining the interface for connecting to Large Language Models.
     Abstracts away specific LLM implementations (e.g. Ollama, OpenAI) from the core logic.
     """
+    def generate_opening_context(self, profile_recap: Optional[str]) -> list:
+        """Generate the system/user prompt context for starting a session."""
+        ...
+
     def psychiatrist_response(self, context: list) -> LLM1Output:
         """Generate a conversational response mimicking a psychiatrist (LLM1 fast path)."""
         ...
@@ -89,6 +93,9 @@ class SessionStore(Protocol):
     def save_session_summary(self, session_id: str, summary: str) -> None:
         """Persist the generated summary of the session when it ends."""
         ...
+    def end_session(self, session_id: str) -> None:
+        """Explicitly mark a session as ended, updating timestamps."""
+        ...
 
 class ProfileStore(Protocol):
     """
@@ -118,6 +125,12 @@ class ProfileStore(Protocol):
         ...
     def get_patient_id(self, session_id: str) -> Optional[str]:
         """Lookup the associated patient ID for a given session."""
+        ...
+    def reset_patient_data(self, patient_id: str) -> None:
+        """Reset the patient's data, including sessions, messages, and profile."""
+        ...
+    def delete_patient(self, patient_id: str) -> None:
+        """Delete a patient and all their associated data completely."""
         ...
 
 class AnalysisJobStore(Protocol):
