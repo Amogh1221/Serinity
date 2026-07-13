@@ -75,7 +75,7 @@ class ChromaVectorStore:
                     search_type="mmr",
                     search_kwargs={
                         "k": bm25_retriever.k,
-                        "fetch_k": min(30, len(documents)),
+                        "fetch_k": max(20, bm25_retriever.k * 3),
                         "lambda_mult": 0.7
                     }
                 )

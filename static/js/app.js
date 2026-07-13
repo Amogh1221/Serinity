@@ -15,16 +15,21 @@ const micBtn = document.getElementById("micBtn");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Processes the assistant's split message response.
+ * Displays and speaks the empathetic acknowledgment first,
+ * then pauses before delivering the follow-up clinical question.
+ * 
+ * @param {string} message - The raw message containing the && separator.
+ */
 async function handleAssistantResponses(message) {
   if (!message) return;
 
   const parts = message.split("&&").map(p => p.trim()).filter(Boolean);
 
-  // 1. Show + speak the acknowledgment part
   ui.addMessage(parts[0], "assistant");
   await audio.speak(parts[0]);
 
-  // 2. If there's a follow-up, show it with a brief therapeutic pause
   if (parts[1]) {
     ui.setStatusText("Assistant is thinking...");
     await sleep(500);

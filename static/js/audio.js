@@ -87,6 +87,12 @@ export function speak(text) {
   });
 }
 
+/**
+ * Starts recording the user's voice via MediaRecorder.
+ * When recording is stopped, the audio blob is sent to the backend for transcription.
+ * 
+ * @param {Function} onTranscriptionDone - Callback fired with the transcribed text and extracted emotion.
+ */
 export async function startRecording(onTranscriptionDone) {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
