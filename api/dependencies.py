@@ -10,13 +10,13 @@ from dotenv import load_dotenv
 from providers.ollama_llm_provider import OllamaLLMProvider
 from providers.sensevoice_stt_provider import SenseVoiceSTTProvider
 from providers.chroma_vector_store import ChromaVectorStore
-from persistence.sqlite_memory_store import SQLiteMemoryStore
+from persistence.sqlite_memory_store import SQLiteProfileStore, SQLiteSessionStore
 from providers.llm_risk_signal import LLMRiskSignal
 from providers.clinical_risk_signal import ClinicalRiskSignal
 from services.risk_assessment_service import RiskAssessmentService
 from services.conversation_orchestrator import ConversationOrchestrator
 from services.patient_service import PatientService
-from core.ports import ProfileStore, SessionStore, AnalysisJobStore, STTProvider
+from core.ports import ProfileStore, SessionStore, STTProvider
 
 load_dotenv()
 
@@ -43,7 +43,8 @@ vector_store = ChromaVectorStore(
     persist_dir=CHROMA_PERSIST_DIR,
     collection_name=CHROMA_COLLECTION
 )
-memory_store = SQLiteMemoryStore(db_path=MEMORY_DB_PATH, working_memory_turns=WORKING_MEMORY_TURNS)
+profile_store = SQLiteProfileStore(db_path=MEMORY_DB_PATH)
+session_store = SQLiteSessionStore(db_path=MEMORY_DB_PATH, working_memory_turns=WORKING_MEMORY_TURNS)
 stt_provider = SenseVoiceSTTProvider()
 
 # Instantiate Risk Service
@@ -56,15 +57,14 @@ risk_service = RiskAssessmentService([
 conversation_orchestrator = ConversationOrchestrator(
     llm_provider=llm_provider,
     vector_store=vector_store,
-    session_store=memory_store,
-    profile_store=memory_store,
-    job_store=memory_store,
+    session_store=session_store,
+    profile_store=profile_store,
     risk_service=risk_service
 )
 
 patient_service = PatientService(
-    profile_store=memory_store,
-    session_store=memory_store,
+    profile_store=profile_store,
+    session_store=session_store,
     llm_provider=llm_provider
 )
 
@@ -78,14 +78,8 @@ def get_patient_service() -> PatientService:
 def get_stt_provider() -> STTProvider:
     return stt_provider
 
-def get_memory_store() -> SQLiteMemoryStore:
-    return memory_store
-
 def get_profile_store() -> ProfileStore:
-    return memory_store
+    return profile_store
 
 def get_session_store() -> SessionStore:
-    return memory_store
-
-def get_job_store() -> AnalysisJobStore:
-    return memory_store
+    return session_store

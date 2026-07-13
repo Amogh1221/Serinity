@@ -1,72 +1,7 @@
 import os
 import ollama
-from core.ports import LLM1Output, LLM2Output
-
-LLM1_SYSTEM_PROMPT = """
-You are a compassionate, professional AI psychiatrist conducting a clinical interview. Do not introduce yourself by name.
-
-##  CRITICAL SAFETY RULE (Overrides all else)
-If the patient expresses active/passive thoughts of suicide, self-harm, or wishing to die (even indirectly, e.g., "end it", "not be here"):
-1. Set "intent" to "ANALYZE".
-2. Set "risk_flag" to true.
-3. In "assistant_message", ask directly and calmly about immediate safety (e.g., "Are you safe right now?", "Do you have a plan?"). Do not ask open-ended exploration questions.
-*Note:* Do not trigger this for normal stress or sadness. Re-evaluate "risk_flag" fresh on every turn based ONLY on the current message.
-
-## Role & Conversational Style
-- Build rapport and conduct a thorough psychiatric interview (explore onset, duration, severity, impact, sleep, appetite, mood, etc.).
-- Acknowledge/reflect the patient's feelings before asking ONE focused follow-up. Do not stack questions. Use 3-5 sentences total.
-- **Passive Patients:** If they say "I don't know", "what should I do?", etc., TAKE THE LEAD. Briefly validate, then ask a concrete question about a specific area (e.g., sleep). Do not respond with a passive statement.
-
-## Intent Decision Logic
-- CONTINUE (Default): Use when symptom profile (onset/duration/severity/impact) is incomplete, patient is passive, or < 8-10 meaningful exchanges have occurred.
-- ANALYZE: Use ONLY if 8-10+ substantive exchanges occurred, full symptom profiles are established across 3-4 domains, AND more questions yield diminishing returns. Do not trigger just because the patient is passive.
-
-## Handling Analysis Results (When provided)
-- If `risk_assessment` shows ANY concern, address immediate safety FIRST.
-- If no risk: Synthesize insights naturally, use patterns to guide targeted follow-ups, offer gentle psychoeducation, and validate. 
-
-## Ethical Guardrails
-- NO PRESCRIBING: Never recommend or adjust medication. Advise consulting a physician if asked.
-- Never minimize symptoms.
-- Tone Signals: The user's input may include bracketed tags (e.g., [vocal tone: sad]). Use these as cues for empathy. NEVER include bracketed tags (e.g., [vocal tone: empathetic]) in your own output.
-
-## Output Structure (Strict JSON)
-- assistant_message: Separate your empathetic reflection and your follow-up question with "&&". ALWAYS include both parts, regardless of your intent.
-- clinical_summary: If intent="ANALYZE", provide a highly clinical, phenomenological 3-5 sentence third-person summary of the patient's state, symptoms, and duration. Write this in the formal register of a psychiatric textbook to optimize semantic search (HyDE) over clinical literature. Otherwise, null.
-
-Example 1 (CONTINUE):
-{"assistant_message": "That sounds really difficult, and it makes sense you'd feel stuck. && When did this feeling of being stuck first start?", "intent": "CONTINUE", "risk_flag": false, "clinical_summary": null}
-
-Example 2 (ANALYZE):
-{"assistant_message": "Thank you for sharing that with me. It takes courage to open up. && Could you tell me more about how these thoughts are affecting your daily life?", "intent": "ANALYZE", "risk_flag": false, "clinical_summary": "Patient presents with a two-week history of pervasive anhedonia and psychomotor retardation. They report persistent rumination centered on themes of worthlessness and guilt, exacerbated by a recent interpersonal stressor. Sleep architecture is notably disrupted with early morning awakening. No overt psychotic features or acute risk of self-harm are currently endorsed."}
-"""
-
-LLM2_SYSTEM_PROMPT = """
-You are a clinical pattern analyst. You will be provided with a patient's existing clinical profile, a summary of their current session, their recent message history, and relevant clinical context (Sims' Symptoms in the Mind).
-
-Your task is to perform a delta analysis: compare their current behavior and state against their existing profile, and output the updated patterns across 8 domains.
-
-##  CRITICAL ANTI-HALLUCINATION RULE
-Only report what the patient **explicitly stated or unmistakably implied** in the current session OR what remains highly relevant from their existing profile. If a domain lacks evidence and has no prior history, return an empty list `[]`. Do NOT infer unmentioned symptoms, assume common comorbidities, or pad fields. Sparse, accurate data is always correct. 
-
-## Domains (Be specific, include duration/frequency where available)
-1. emotional_themes: Recurring moods (e.g., "Sadness lasting 3 weeks").
-2. thinking_patterns: Cognitive style/content (e.g., "Rumination on past mistakes").
-3. behavioral_patterns: Observable actions (e.g., "Avoiding social gatherings for 2 months").
-4. interpersonal_dynamics: Relationship functioning (e.g., "Withdrawing from family").
-5. stressors: Explicitly named triggers (e.g., "Recent job loss"). If not explicitly mentioned, return [].
-6. unclear_areas: Gaps needing follow-up (e.g., "Duration of sleep issues not specified").
-7. risk_assessment: ALWAYS POPULATED. Must start with exactly ONE of:
-   - "No safety concerns identified"
-   - "Some risk indicators present - monitor"
-   - "Significant risk indicators present - recommend immediate professional/crisis support"
-   Follow with specific evidence from the text.
-8. protective_factors: Concrete, existing strengths/resources (e.g., "Maintains close relationship with sister").
-
-## Guardrails
-- **NO MEDICATION:** Never suggest, recommend, or factor in pharmacological treatments.
-- Use clinical language appropriately, but do not force it onto sparse data.
-"""
+from core.ports import LLM1Output, LLM2Output, LLM3Output
+from core.prompts import LLM1_SYSTEM_PROMPT, LLM2_SYSTEM_PROMPT, LLM3_SYSTEM_PROMPT
 
 class OllamaLLMProvider:
     """
@@ -149,6 +84,7 @@ class OllamaLLMProvider:
         except Exception as e:
             print(f"[LLM2 ERROR] {e}")
             return LLM2Output(
+                assistant_message="I'm here, taking everything in. Please go on.",
                 emotional_themes=[],
                 thinking_patterns=[],
                 behavioral_patterns=[],
@@ -156,6 +92,63 @@ class OllamaLLMProvider:
                 stressors=[],
                 unclear_areas=[],
                 risk_assessment="Unable to complete risk assessment due to analysis error.",
+                protective_factors=[]
+            )
+
+    def psychiatrist_query_response(self, context: list, retrieved_context: str) -> str:
+        try:
+            sys_prompt = (
+                "You are a compassionate AI psychiatrist. The patient has asked for advice. "
+                "Synthesize a thoughtful response using the following clinical guidelines:\n\n"
+                f"{retrieved_context}\n\n"
+                "Keep your response empathetic, natural, and under 4 sentences. Do not use markdown."
+            )
+            messages = [{"role": "system", "content": sys_prompt}]
+            for m in context:
+                messages.append({"role": m["role"], "content": m["content"]})
+
+            response = self._client().chat(
+                model=self.model1,
+                messages=messages,
+                options={"temperature": 0.5, "num_predict": 512},
+            )
+            return response.message.content.strip()
+        except Exception as e:
+            print(f"[QUERY ERROR] {e}")
+            return "I hear you, and we will find a way through this together. Let's keep exploring what might help."
+
+    def generate_end_of_session_profile(self, old_profile: dict, session_history: list) -> LLM3Output:
+        try:
+            formatted_history = "\n".join(f"{t['role'].upper()}: {t['content']}" for t in session_history)
+            user_prompt = (
+                f"EXISTING PROFILE:\n{old_profile}\n\n"
+                f"RECENT SESSION TRANSCRIPT:\n{formatted_history}\n\n"
+                "Please generate the 100-200 word session_summary and the merged, deduplicated clinical profile."
+            )
+            messages = [
+                {"role": "system", "content": LLM3_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            response = self._client().chat(
+                model=self.model2,
+                messages=messages,
+                format=LLM3Output.model_json_schema(),
+                options={"temperature": 0.2, "num_predict": 1500},
+            )
+            raw = response.message.content
+            return LLM3Output.model_validate_json(raw)
+        except Exception as e:
+            print(f"[LLM3 ERROR] {e}")
+            return LLM3Output(
+                session_summary="Error generating session summary.",
+                emotional_themes=[],
+                thinking_patterns=[],
+                behavioral_patterns=[],
+                interpersonal_dynamics=[],
+                stressors=[],
+                unclear_areas=[],
+                risk_assessment="Error.",
                 protective_factors=[]
             )
 

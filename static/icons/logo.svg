@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="mossGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4B6358" />
+      <stop offset="100%" stop-color="#2D3B34" />
+    </linearGradient>
+    <linearGradient id="clayGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9C7A5B" />
+      <stop offset="100%" stop-color="#6E5640" />
+    </linearGradient>
+  </defs>
+
+  <!-- Top arc of the S -->
+  <path d="M 80 30 
+           C 80 10, 50 10, 35 20 
+           C 20 30, 20 45, 45 55 
+           C 55 59, 70 65, 80 80" 
+        fill="none" stroke="url(#mossGradient)" stroke-width="14" stroke-linecap="round" />
+        
+  <!-- Bottom arc of the S -->
+  <path d="M 20 70 
+           C 20 90, 50 90, 65 80 
+           C 80 70, 80 55, 55 45 
+           C 45 41, 30 35, 20 20" 
+        fill="none" stroke="url(#clayGradient)" stroke-width="14" stroke-linecap="round" opacity="0.9" />
+</svg>

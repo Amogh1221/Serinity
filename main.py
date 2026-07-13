@@ -2,23 +2,32 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+import asyncio
 from api.routes import router
-from api.dependencies import get_job_store
+from api.dependencies import get_patient_service
+
+async def session_sweeper_task():
+    """Background task to sweep idle sessions every 5 minutes."""
+    while True:
+        try:
+            # Sweep sessions inactive for 30 minutes
+            get_patient_service().sweep_abandoned_sessions(timeout_minutes=30)
+        except Exception as e:
+            print(f"[Sweeper Error] {e}")
+        # Sleep for 5 minutes
+        await asyncio.sleep(300)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifespan manager.
-    On startup, it attempts to recover any background analysis jobs that were 
-    interrupted by a server crash or restart.
-    """
-    store = get_job_store()
-    try:
-        store.recover_orphaned_jobs()
-        print("[Startup] Recovered orphaned background analysis jobs.")
-    except Exception as e:
-        print(f"[Startup] Error recovering jobs: {e}")
+    # Startup: Start the background sweeper
+    sweeper = asyncio.create_task(session_sweeper_task())
     yield
+    # Shutdown: Cancel the task
+    sweeper.cancel()
+    try:
+        await sweeper
+    except asyncio.CancelledError:
+        pass
 
 app = FastAPI(title="Serinity", version="2.0.0", lifespan=lifespan)
 

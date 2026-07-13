@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Serinity - Mental Healthcare</title>
+  <link rel="icon" type="image/svg+xml" href="/static/icons/logo.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="/static/css/style.css">
   <script>
@@ -127,7 +128,7 @@
           <h2 class="text-3xl font-display text-ink" id="dashboardPatientName">Patient Name</h2>
           <p class="text-xs font-utility tracking-widest uppercase text-clay mt-2" id="dashboardPatientAge">Age: --</p>
         </div>
-        <button class="btn-primary" id="dashboardStartBtn">START SESSION</button>
+          <button class="btn-primary" id="dashboardStartBtn">NEW SESSION</button>
       </div>
       
       <!-- Content -->
@@ -169,9 +170,12 @@
     <!-- Header -->
     <header class="bg-paper border-b border-ink z-10 py-3">
       <div class="w-full px-6 md:px-12 mx-auto flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-display text-ink" id="headerName">Serinity</h1>
-          <p class="text-xs font-utility text-clay tracking-widest uppercase">Clinical Session</p>
+        <div class="flex items-center gap-4">
+          <img src="/static/icons/logo.svg" alt="Serinity Logo" class="w-10 h-10 opacity-90" />
+          <div>
+            <h1 class="text-3xl font-display text-ink" id="headerName">Serinity</h1>
+            <p class="text-xs font-utility text-clay tracking-widest uppercase mt-0.5">Clinical Session</p>
+          </div>
         </div>
         <div class="flex items-center gap-4">
           <span id="sessionStats" class="text-xs font-utility text-moss uppercase hidden sm:block"></span>
@@ -256,6 +260,6 @@
     </div>
   </div>
 
-  <script type="module" src="/static/js/app.js"></script>
+  <script type="module" src="/static/js/app.js?v=2.0"></script>
 </body>
 </html>

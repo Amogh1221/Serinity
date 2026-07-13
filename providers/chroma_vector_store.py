@@ -88,7 +88,7 @@ class ChromaVectorStore:
             else:
                 self.ensemble_retriever = None
 
-    def retrieve(self, query: str) -> str:
+    def retrieve(self, query: str, k: int = 8) -> str:
         if not query or not query.strip():
             return ""
 
@@ -96,8 +96,8 @@ class ChromaVectorStore:
             if self.ensemble_retriever:
                 results = self.ensemble_retriever.invoke(query)
                 # EnsembleRetriever returns a list of Document objects
-                # We limit the final combined output to the top 8 matches
-                return "\n\n".join([doc.page_content for doc in results[:8]])
+                # We limit the final combined output to the top k matches
+                return "\n\n".join([doc.page_content for doc in results[:k]])
             
             # Fallback if ensemble isn't ready (e.g. empty DB)
             count = self.vectorstore._collection.count()
@@ -105,7 +105,7 @@ class ChromaVectorStore:
                 return ""
             
             actual_fetch_k = min(30, count)
-            actual_k = min(8, actual_fetch_k)
+            actual_k = min(k, actual_fetch_k)
 
             results = self.vectorstore.max_marginal_relevance_search(
                 query,
@@ -118,7 +118,7 @@ class ChromaVectorStore:
         except Exception as e:
             print(f"[RAG ERROR] Hybrid search failed: {e}. Attempting similarity fallback.")
             try:
-                results = self.vectorstore.similarity_search(query, k=8)
+                results = self.vectorstore.similarity_search(query, k=k)
                 return "\n\n".join([doc.page_content for doc in results])
             except Exception as e2:
                 print(f"[RAG ERROR] Similarity fallback also failed: {e2}")

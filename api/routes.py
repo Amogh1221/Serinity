@@ -69,24 +69,22 @@ def patient_dashboard(
     }
 
 @router.post("/patients/{patient_id}/reset")
-def reset_patient_data(
+def reset_patient(
     patient_id: str,
-    background_tasks: BackgroundTasks,
     patient_service: PatientService = Depends(get_patient_service)
 ):
     """Reset the patient's data, including sessions, messages, and profile."""
-    background_tasks.add_task(patient_service.reset_patient_data, patient_id)
-    return {"status": "accepted", "message": "Patient data reset initiated in background."}
+    patient_service.reset_patient_data(patient_id)
+    return {"status": "success", "message": "Patient data reset successfully."}
 
 @router.delete("/patients/{patient_id}")
 def delete_patient(
     patient_id: str,
-    background_tasks: BackgroundTasks,
     patient_service: PatientService = Depends(get_patient_service)
 ):
     """Delete a patient and all their associated data completely."""
-    background_tasks.add_task(patient_service.delete_patient, patient_id)
-    return {"status": "accepted", "message": "Patient deletion initiated in background."}
+    patient_service.delete_patient(patient_id)
+    return {"status": "success", "message": "Patient deleted successfully."}
 
 @router.post("/end_session")
 def end_session_endpoint(
@@ -113,11 +111,9 @@ def start_session(
     }
 
 
-
 @router.post("/chat_text")
 def chat_text(
     request: ChatRequest, 
-    background_tasks: BackgroundTasks,
     orchestrator: ConversationOrchestrator = Depends(get_orchestrator),
     patient_service: PatientService = Depends(get_patient_service),
     session_store: SessionStore = Depends(get_session_store),
@@ -125,8 +121,7 @@ def chat_text(
 ):
     """
     Process a user's chat message through the core orchestrator.
-    If the orchestrator triggers an 'ANALYZE' intent, this endpoint dispatches
-    the heavy LLM2 pattern analysis job to FastAPI's BackgroundTasks.
+    LLM2 analysis is run synchronously within the orchestrator if triggered.
     """
     if not session_store.session_exists(request.session_id):
         session_id, opening_message, patient_id = patient_service.create_new_session(request.patient_id)
@@ -143,17 +138,7 @@ def chat_text(
         emotion=request.emotion,
         default_patient_id=request.patient_id
     )
-    
-    if chat_result.job_id:
-        patient_id = profile_store.get_patient_id(request.session_id) or request.patient_id
-        if patient_id:
-            background_tasks.add_task(
-                orchestrator.run_background_analysis,
-                chat_result.job_id,
-                request.session_id,
-                patient_id,
-                chat_result.clinical_summary
-            )
+
 
     return {
         "assistant_message": chat_result.assistant_message,
@@ -177,3 +162,12 @@ async def transcribe(
         "emotion": result.get("emotion", "unknown"),
         "event":   result.get("event",   None),
     }
+
+@router.get("/{full_path:path}", response_class=HTMLResponse)
+def catch_all(request: Request, full_path: str):
+    """
+    Catch-all route to support History API (clean URLs) in the frontend SPA.
+    If the user navigates directly to /profiles or /dashboard, serve index.html
+    so the frontend JS can handle the routing.
+    """
+    return templates.TemplateResponse(request, "index.html")

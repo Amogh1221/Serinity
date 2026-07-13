@@ -46,15 +46,17 @@ class DebugLogger:
     Per-session logger. Create one instance per session and call close() when done.
     """
 
-    def __init__(self, session_id: str, user_name: str = "Unknown"):
+    def __init__(self, session_id: str, user_name: str = "Unknown", session_number: int = 1):
         self.session_id = session_id
-        os.makedirs(LOG_DIR, exist_ok=True)
 
-        # Format date-time as HH-MM-SS_DD-MM-YYYY
-        ts_slug = datetime.now().strftime("%H-%M-%S_%d-%m-%Y")
+        # Format date-time as SS-MM-HH_DD-MM-YY
+        ts_slug = datetime.now().strftime("%S-%M-%H_%d-%m-%y")
         safe_user_name = "".join(c for c in user_name if c.isalnum() or c in (' ', '_', '-')).strip().replace(" ", "_")
         
-        self._jsonl_path = os.path.join(LOG_DIR, f"{safe_user_name}({ts_slug}).jsonl")
+        user_log_dir = os.path.join(LOG_DIR, safe_user_name)
+        os.makedirs(user_log_dir, exist_ok=True)
+        
+        self._jsonl_path = os.path.join(user_log_dir, f"S{session_number}_{ts_slug}.jsonl")
 
         self._jsonl = open(self._jsonl_path, "a", encoding="utf-8")
         self._turn  = 0
@@ -111,6 +113,7 @@ class DebugLogger:
         """Log the full LLM2 analysis output."""
         self._write_jsonl("llm2_output", {
             "turn":                  self._turn,
+            "assistant_message":     getattr(llm2_response, "assistant_message", ""),
             "emotional_themes":      llm2_response.emotional_themes,
             "thinking_patterns":     llm2_response.thinking_patterns,
             "behavioral_patterns":   llm2_response.behavioral_patterns,
@@ -126,6 +129,17 @@ class DebugLogger:
         self._write_jsonl("llm1_final", {
             "turn":    self._turn,
             "message": llm1_output.assistant_message,
+        })
+
+    def llm3_output(self, llm3_response):
+        """Log the full post-session LLM3 analysis."""
+        self._write_jsonl("llm3_output", {
+            "session_summary":       getattr(llm3_response, "session_summary", ""),
+            "emotional_themes":      getattr(llm3_response, "emotional_themes", []),
+            "thinking_patterns":     getattr(llm3_response, "thinking_patterns", []),
+            "behavioral_patterns":   getattr(llm3_response, "behavioral_patterns", []),
+            "interpersonal_dynamics":getattr(llm3_response, "interpersonal_dynamics", []),
+            "stressors":             getattr(llm3_response, "stressors", []),
         })
 
     def assistant_reply(self, message: str, risk_injected: bool, latency_ms: int = 0):
@@ -161,10 +175,10 @@ class DebugLogger:
 _active_loggers: dict[str, DebugLogger] = {}
 
 
-def get_logger(session_id: str, user_name: str = "Unknown") -> DebugLogger:
+def get_logger(session_id: str, user_name: str = "Unknown", session_number: int = 1) -> DebugLogger:
     """Get or create a DebugLogger for the given session."""
     if session_id not in _active_loggers:
-        _active_loggers[session_id] = DebugLogger(session_id, user_name)
+        _active_loggers[session_id] = DebugLogger(session_id, user_name, session_number)
     return _active_loggers[session_id]
 
 

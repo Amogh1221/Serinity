@@ -3,17 +3,13 @@ import json
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Any
 from core.ports import LLM2Output, LLMProvider
 
-class SQLiteMemoryStore:
-    """
-    Concrete implementation of ProfileStore, SessionStore, and AnalysisJobStore using SQLite.
-    Provides durable, local storage for patients, conversational context, and background job state.
-    """
-    def __init__(self, db_path: str, working_memory_turns: int):
+class SQLiteBaseStore:
+    """Base class for SQLite stores providing connection and initialization."""
+    def __init__(self, db_path: str):
         self.db_path = db_path
-        self.working_memory_turns = working_memory_turns
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -40,7 +36,9 @@ class SQLiteMemoryStore:
                     patient_id      TEXT,
                     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_active_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_active       INTEGER DEFAULT 1,
                     rolling_summary TEXT DEFAULT '',
+                    summarized_msg_count INTEGER DEFAULT 0,
                     FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
                 );
 
@@ -56,40 +54,44 @@ class SQLiteMemoryStore:
                 CREATE TABLE IF NOT EXISTS patient_profile (
                     patient_id   TEXT PRIMARY KEY,
                     profile_json TEXT NOT NULL DEFAULT '{}',
+                    long_term_memory_json TEXT NOT NULL DEFAULT '{}',
                     updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (patient_id) REFERENCES patients(patient_id)
-                );
-
-                CREATE TABLE IF NOT EXISTS analysis_jobs (
-                    job_id       TEXT PRIMARY KEY,
-                    session_id   TEXT NOT NULL,
-                    patient_id   TEXT NOT NULL,
-                    status       TEXT NOT NULL CHECK(status IN ('queued', 'in_progress', 'completed', 'failed')),
-                    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_messages_session
                     ON messages(session_id, id);
             """)
 
-            # Safe migration for existing DB
+            # Safe migrations
             try:
                 conn.execute("ALTER TABLE patients ADD COLUMN gender TEXT")
                 conn.execute("ALTER TABLE patients ADD COLUMN occupation TEXT")
                 conn.execute("ALTER TABLE patients ADD COLUMN primary_concern TEXT")
             except sqlite3.OperationalError:
-                pass # Columns already exist
+                pass 
+                
+            try:
+                conn.execute("ALTER TABLE patient_profile ADD COLUMN long_term_memory_json TEXT NOT NULL DEFAULT '{}'")
+            except sqlite3.OperationalError:
+                pass 
                 
             try:
                 conn.execute("ALTER TABLE sessions ADD COLUMN summarized_msg_count INTEGER DEFAULT 0")
             except sqlite3.OperationalError:
-                pass # Column already exists
+                pass 
+                
+            try:
+                conn.execute("ALTER TABLE sessions ADD COLUMN is_active INTEGER DEFAULT 1")
+            except sqlite3.OperationalError:
+                pass 
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    # --- ProfileStore Implementation ---
+
+class SQLiteProfileStore(SQLiteBaseStore):
+    """Concrete implementation of ProfileStore using SQLite."""
 
     def create_patient(
         self, 
@@ -135,27 +137,64 @@ class SQLiteMemoryStore:
         except Exception:
             return {}
 
-    def update_patient_profile(self, patient_id: str, llm2_output: LLM2Output) -> None:
-        profile = self.get_patient_profile(patient_id)
+    def get_long_term_memory(self, patient_id: str) -> dict:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT long_term_memory_json FROM patient_profile WHERE patient_id=?",
+                (patient_id,),
+            ).fetchone()
+        if not row:
+            return {}
+        try:
+            return json.loads(row["long_term_memory_json"])
+        except Exception:
+            return {}
 
-        # Dynamically process all list-based fields to adhere to OCP
+    def update_long_term_memory(self, patient_id: str, llm_output: Any) -> None:
+        memory = self.get_long_term_memory(patient_id)
         list_fields = [
-            field for field, field_info in LLM2Output.model_fields.items()
-            if field != "risk_assessment"
+            "emotional_themes", "thinking_patterns", "behavioral_patterns", 
+            "interpersonal_dynamics", "stressors", "unclear_areas", "protective_factors"
         ]
 
         for field in list_fields:
-            existing = profile.get(field, [])
-            new_items = getattr(llm2_output, field, [])
-            existing_lower = {x.lower() for x in existing}
-            for item in new_items:
-                if item.lower() not in existing_lower:
-                    existing.append(item)
-                    existing_lower.add(item.lower())
-            profile[field] = existing
+            if hasattr(llm_output, field):
+                memory[field] = getattr(llm_output, field)
 
-        profile["risk_assessment"] = getattr(llm2_output, "risk_assessment", "Not yet assessed")
-        profile["last_analyzed"]   = self._now()
+        if hasattr(llm_output, "risk_assessment"):
+            memory["risk_assessment"] = getattr(llm_output, "risk_assessment")
+            
+        memory["last_analyzed"] = self._now()
+
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO patient_profile(patient_id, long_term_memory_json, updated_at)
+                VALUES(?,?,?)
+                ON CONFLICT(patient_id) DO UPDATE SET
+                    long_term_memory_json=excluded.long_term_memory_json,
+                    updated_at=excluded.updated_at
+                """,
+                (patient_id, json.dumps(memory), self._now()),
+            )
+
+    def update_patient_profile(self, patient_id: str, llm_output: Any) -> None:
+        profile = self.get_patient_profile(patient_id)
+        list_fields = [
+            "emotional_themes", "thinking_patterns", "behavioral_patterns", 
+            "interpersonal_dynamics", "stressors", "unclear_areas", "protective_factors"
+        ]
+
+        for field in list_fields:
+            if hasattr(llm_output, field):
+                profile[field] = getattr(llm_output, field)
+
+        if hasattr(llm_output, "risk_assessment"):
+            profile["risk_assessment"] = getattr(llm_output, "risk_assessment")
+        if hasattr(llm_output, "session_summary"):
+            profile["last_session_summary"] = getattr(llm_output, "session_summary")
+            
+        profile["last_analyzed"] = self._now()
 
         with self._get_conn() as conn:
             conn.execute(
@@ -172,44 +211,38 @@ class SQLiteMemoryStore:
     def get_patient_sessions(self, patient_id: str) -> list[dict]:
         with self._get_conn() as conn:
             rows = conn.execute(
-                "SELECT session_id, created_at, last_active_at, rolling_summary FROM sessions WHERE patient_id=? ORDER BY created_at DESC",
+                "SELECT session_id, created_at, last_active_at, rolling_summary, is_active FROM sessions WHERE patient_id=? ORDER BY created_at DESC",
                 (patient_id,)
             ).fetchall()
         return [dict(r) for r in rows]
 
     def build_profile_recap(self, patient_id: str) -> Optional[str]:
-        profile = self.get_patient_profile(patient_id)
-        if not profile:
-            return None
+        memory = self.get_long_term_memory(patient_id)
+        if not memory:
+            memory = self.get_patient_profile(patient_id)
+            if not memory:
+                return None
 
         lines = ["[Returning patient — prior session context (not to be quoted back verbatim)]:"]
 
-        recap = profile.get("last_session_summary")
+        recap = memory.get("last_session_summary")
         if recap:
             lines.append(f"Last session summary: {recap}")
-        if profile.get("emotional_themes"):
-            lines.append(f"Emotional themes: {'; '.join(profile['emotional_themes'][:4])}")
-        if profile.get("stressors"):
-            lines.append(f"Key stressors: {'; '.join(profile['stressors'][:4])}")
-        if profile.get("risk_assessment") and profile["risk_assessment"] != "Not yet assessed":
-            lines.append(f"Last risk status: {profile['risk_assessment'][:120]}")
-        if profile.get("protective_factors"):
-            lines.append(f"Protective factors: {'; '.join(profile['protective_factors'][:3])}")
-        if profile.get("last_analyzed"):
-            lines.append(f"Last analyzed: {profile['last_analyzed']}")
+        if memory.get("emotional_themes"):
+            lines.append(f"Emotional themes: {'; '.join(memory['emotional_themes'][:4])}")
+        if memory.get("stressors"):
+            lines.append(f"Key stressors: {'; '.join(memory['stressors'][:4])}")
+        if memory.get("risk_assessment") and memory["risk_assessment"] != "Not yet assessed":
+            lines.append(f"Last risk status: {memory['risk_assessment'][:120]}")
+        if memory.get("protective_factors"):
+            lines.append(f"Protective factors: {'; '.join(memory['protective_factors'][:3])}")
+        if memory.get("last_analyzed"):
+            lines.append(f"Last analyzed: {memory['last_analyzed']}")
 
         return "\n".join(lines)
 
-    def get_patient_id(self, session_id: str) -> Optional[str]:
-        with self._get_conn() as conn:
-            row = conn.execute(
-                "SELECT patient_id FROM sessions WHERE session_id=?", (session_id,)
-            ).fetchone()
-        return row["patient_id"] if row else None
-
     def reset_patient_data(self, patient_id: str) -> None:
         with self._get_conn() as conn:
-            conn.execute("DELETE FROM analysis_jobs WHERE patient_id = ?", (patient_id,))
             conn.execute("DELETE FROM messages WHERE session_id IN (SELECT session_id FROM sessions WHERE patient_id = ?)", (patient_id,))
             conn.execute("DELETE FROM sessions WHERE patient_id = ?", (patient_id,))
             conn.execute(
@@ -219,14 +252,18 @@ class SQLiteMemoryStore:
 
     def delete_patient(self, patient_id: str) -> None:
         with self._get_conn() as conn:
-            conn.execute("DELETE FROM analysis_jobs WHERE patient_id = ?", (patient_id,))
             conn.execute("DELETE FROM messages WHERE session_id IN (SELECT session_id FROM sessions WHERE patient_id = ?)", (patient_id,))
             conn.execute("DELETE FROM sessions WHERE patient_id = ?", (patient_id,))
             conn.execute("DELETE FROM patient_profile WHERE patient_id = ?", (patient_id,))
             conn.execute("DELETE FROM patients WHERE patient_id = ?", (patient_id,))
 
 
-    # --- SessionStore Implementation ---
+class SQLiteSessionStore(SQLiteBaseStore):
+    """Concrete implementation of SessionStore using SQLite."""
+
+    def __init__(self, db_path: str, working_memory_turns: int):
+        super().__init__(db_path)
+        self.working_memory_turns = working_memory_turns
 
     def create_session(self, patient_id: Optional[str] = None) -> str:
         session_id = str(uuid.uuid4())
@@ -242,66 +279,27 @@ class SQLiteMemoryStore:
                     "INSERT INTO patients(patient_id, name, age) VALUES(?,?,?)",
                     (patient_id, "Guest Patient", None),
                 )
-                
-        now = self._now()
+        
         with self._get_conn() as conn:
             conn.execute(
-                "INSERT INTO sessions(session_id, patient_id, created_at, last_active_at) VALUES(?,?,?,?)",
-                (session_id, patient_id, now, now),
+                "INSERT INTO sessions(session_id, patient_id, is_active, created_at, last_active_at) VALUES(?,?,1,?,?)",
+                (session_id, patient_id, self._now(), self._now()),
             )
         return session_id
 
     def end_session(self, session_id: str) -> None:
         with self._get_conn() as conn:
             conn.execute(
-                "UPDATE sessions SET last_active_at=? WHERE session_id=?",
+                "UPDATE sessions SET last_active_at=?, is_active=0 WHERE session_id=?",
                 (self._now(), session_id),
             )
-        
-    # --- Background Job Management ---
-    def queue_analysis_job(self, session_id: str, patient_id: str) -> str:
-        job_id = str(uuid.uuid4())
+            
+    def get_abandoned_sessions(self, timeout_minutes: int) -> list[str]:
         with self._get_conn() as conn:
-            conn.execute(
-                "INSERT INTO analysis_jobs (job_id, session_id, patient_id, status) VALUES (?, ?, ?, 'queued')",
-                (job_id, session_id, patient_id)
-            )
-        return job_id
-
-    def acquire_analysis_job(self, job_id: str, patient_id: str) -> bool:
-        """Atomically acquires a job if no other job for this patient is in progress."""
-        with self._get_conn() as conn:
-            cur = conn.execute("""
-                UPDATE analysis_jobs 
-                SET status = 'in_progress', updated_at = CURRENT_TIMESTAMP 
-                WHERE job_id = ? AND status = 'queued'
-                AND NOT EXISTS (
-                    SELECT 1 FROM analysis_jobs 
-                    WHERE patient_id = ? AND status = 'in_progress'
-                )
-            """, (job_id, patient_id))
-            return cur.rowcount > 0
-
-    def complete_analysis_job(self, job_id: str):
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE analysis_jobs SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE job_id = ?",
-                (job_id,)
-            )
-
-    def fail_analysis_job(self, job_id: str):
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE analysis_jobs SET status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE job_id = ?",
-                (job_id,)
-            )
-
-    def recover_orphaned_jobs(self):
-        """Called on startup to reset jobs stuck in_progress due to server crash."""
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE analysis_jobs SET status = 'queued', updated_at = CURRENT_TIMESTAMP WHERE status = 'in_progress'"
-            )
+            rows = conn.execute(
+                f"SELECT session_id FROM sessions WHERE is_active=1 AND last_active_at < datetime('now', '-{timeout_minutes} minutes')"
+            ).fetchall()
+        return [r["session_id"] for r in rows]
 
     def session_exists(self, session_id: str) -> bool:
         with self._get_conn() as conn:
@@ -350,21 +348,8 @@ class SQLiteMemoryStore:
         if len(all_msgs) <= self.working_memory_turns:
             return all_msgs
 
-        overflow = all_msgs[:-self.working_memory_turns]
-        tail     = all_msgs[-self.working_memory_turns:]
-
-        summary, summarized_count = self._get_rolling_summary(session_id)
-        
-        if len(overflow) > summarized_count and llm_engine is not None:
-            new_overflow = overflow[summarized_count:]
-            
-            if summary:
-                turns_to_summarize = [{"role": "system", "content": f"Previous summary: {summary}"}] + new_overflow
-            else:
-                turns_to_summarize = new_overflow
-                
-            summary = llm_engine.summarize_history(turns_to_summarize)
-            self._set_rolling_summary(session_id, summary, len(overflow))
+        tail = all_msgs[-self.working_memory_turns:]
+        summary, _ = self._get_rolling_summary(session_id)
 
         context = []
         if summary:
@@ -375,22 +360,23 @@ class SQLiteMemoryStore:
         context.extend(tail)
         return context
 
+    def get_patient_id(self, session_id: str) -> Optional[str]:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT patient_id FROM sessions WHERE session_id=?", (session_id,)
+            ).fetchone()
+        return row["patient_id"] if row else None
+
+    def get_session_count(self, patient_id: str) -> int:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE patient_id=?", (patient_id,)
+            ).fetchone()
+        return row[0]
+
     def save_session_summary(self, session_id: str, summary: str) -> None:
-        patient_id = self.get_patient_id(session_id)
-        if not patient_id:
-            return
-        
-        profile = self.get_patient_profile(patient_id)
-        profile["last_session_summary"] = summary
-        profile["last_session_at"] = self._now()
         with self._get_conn() as conn:
             conn.execute(
-                """
-                INSERT INTO patient_profile(patient_id, profile_json, updated_at)
-                VALUES(?,?,?)
-                ON CONFLICT(patient_id) DO UPDATE SET
-                    profile_json=excluded.profile_json,
-                    updated_at=excluded.updated_at
-                """,
-                (patient_id, json.dumps(profile), self._now()),
+                "UPDATE sessions SET rolling_summary = ? WHERE session_id = ?",
+                (summary, session_id)
             )

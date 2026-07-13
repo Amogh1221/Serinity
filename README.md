@@ -19,12 +19,13 @@ Mental healthcare is heavily stigmatized, expensive, and largely inaccessible fo
 **Serinity matters because it provides enterprise-grade, intelligent psychiatric assessment completely offline.** By running locally on the user's device, we guarantee absolute data privacy. Users can speak freely about their mental state without fear of their data being harvested, leaked, or used for model training by third-party cloud providers. Furthermore, an offline-first approach eliminates cloud API latency, providing a seamless, real-time voice experience.
 
 ##  How It Works
-Serinity utilizes a "Sync Fast-Path, Async Slow-Path" architecture combining two specialized models and local semantic search:
+Serinity utilizes an "Intent-Driven Synchronous 3-Pipeline" architecture combining specialized LLM behaviors and local semantic search:
 
-1. **Dual-LLM Architecture (via Ollama)**: 
-   - **LLM1 (Conversational)**: `phi4-mini` handles real-time dialogue, acting as an empathetic interviewer with therapeutic rapport-building capabilities.
-   - **LLM2 (Analyst)**: `qwen2.5:7b-instruct` runs asynchronous, heavy pattern-recognition across multiple psychological domains (Emotional Themes, Behavioral Patterns, Risk Assessment, etc.).
-2. **Local RAG Pipeline**: Uses a local **ChromaDB** instance to perform semantic searches over 122k+ psychiatric Q&A pairs (using `nomic-embed-text` embeddings), providing clinical context to the LLMs.
+1. **Tri-Pipeline LLM Architecture (via Ollama)**: 
+   - **LLM1 (Conversational/Query)**: `phi4-mini` handles real-time dialogue, acting as an empathetic interviewer. If the user asks for advice, it triggers a synchronous RAG pipeline to provide immediate, evidence-based answers.
+   - **LLM2 (Analyst)**: `qwen2.5:7b-instruct` runs synchronous, heavy pattern-recognition across multiple psychological domains during the session.
+   - **LLM3 (Profile Manager)**: `qwen2.5:7b-instruct` runs at the end of the session to generate concise clinical summaries and intelligently merge/deduplicate long-term patient profiles.
+2. **Local RAG Pipeline**: Uses a local **ChromaDB** instance to perform semantic searches over 122k+ psychiatric Q&A pairs (using `nomic-embed-text` embeddings with HyDE optimization), providing clinical context to the LLMs.
 3. **Voice Processing**: Uses **SenseVoice-Small** via FunASR for Speech-to-Text and emotional tone detection, while utilizing the Browser-native Web Speech API for zero-latency Text-to-Speech.
 4. **Session Management**: Persistent SQLite-backed patient memory tracks previous session summaries and continuously evaluates safety risk flags.
 

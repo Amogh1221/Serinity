@@ -1,6 +1,6 @@
 import time
 from typing import Optional
-from core.ports import LLMProvider, VectorStore, SessionStore, ProfileStore, AnalysisJobStore, LLM1Output
+from core.ports import LLMProvider, VectorStore, SessionStore, ProfileStore, LLM1Output
 from core.schemas import ChatResult
 from services.risk_assessment_service import RiskAssessmentService
 from core.logger import get_logger
@@ -8,8 +8,7 @@ from core.logger import get_logger
 class ConversationOrchestrator:
     """
     Central coordinator for the application's core logic.
-    Implements a 'Sync Fast-Path, Async Slow-Path' architecture to decouple 
-    immediate conversational responses (LLM1) from deep psychological analysis (LLM2).
+    Implements a 'Sync 3-Pipeline' architecture.
     """
     def __init__(
         self,
@@ -17,14 +16,12 @@ class ConversationOrchestrator:
         vector_store: VectorStore,
         session_store: SessionStore,
         profile_store: ProfileStore,
-        job_store: AnalysisJobStore,
         risk_service: RiskAssessmentService
     ):
         self.llm_provider = llm_provider
         self.vector_store = vector_store
         self.session_store = session_store
         self.profile_store = profile_store
-        self.job_store = job_store
         self.risk_service = risk_service
 
     def _format_list(self, items: list) -> str:
@@ -35,11 +32,12 @@ class ConversationOrchestrator:
     def handle_message(self, session_id: str, message: str, emotion: Optional[str], default_patient_id: Optional[str]) -> ChatResult:
         start_time = time.time()
         
-        patient_id = self.profile_store.get_patient_id(session_id) or default_patient_id
+        patient_id = self.session_store.get_patient_id(session_id) or default_patient_id
         patient_info = self.profile_store.get_patient(patient_id) if patient_id else None
         user_name = patient_info.get("name", "Guest Patient") if patient_info else "Guest Patient"
         
-        log = get_logger(session_id, user_name)
+        session_number = self.session_store.get_session_count(patient_id) if patient_id else 1
+        log = get_logger(session_id, user_name, session_number)
         
         emotion = (emotion or "").lower().strip()
         user_message = message
@@ -61,34 +59,41 @@ class ConversationOrchestrator:
         if base_risk and intent != "ANALYZE":
             intent = "ANALYZE"
             
-        self.session_store.append_message(session_id, "assistant", llm1_response.assistant_message)
+        final_message = llm1_response.assistant_message
+
+        # Sync fast-path for user queries
+        if intent == "QUERY" and llm1_response.search_query:
+            retrieved_context = self.vector_store.retrieve(llm1_response.search_query, k=3)
+            log.analyze_triggered(llm1_response.search_query, "query")
+            log.retrieved_context(retrieved_context)
+            final_message = self.llm_provider.psychiatrist_query_response(history, retrieved_context)
+            
+        # Synchronous execution of LLM2 pipeline
+        if intent == "ANALYZE" and patient_id:
+            llm2_message = self._run_sync_analysis(session_id, patient_id, llm1_response.clinical_summary)
+            if llm2_message:
+                final_message = llm2_message
+
+        self.session_store.append_message(session_id, "assistant", final_message)
         latency_ms = int((time.time() - start_time) * 1000)
-        log.assistant_reply(llm1_response.assistant_message, risk_injected=base_risk, latency_ms=latency_ms)
+        log.assistant_reply(final_message, risk_injected=base_risk, latency_ms=latency_ms)
         
         chat_result = ChatResult(
-            assistant_message=llm1_response.assistant_message,
+            assistant_message=final_message,
             intent=intent,
             risk_flagged=base_risk,
             job_id=None,
             clinical_summary=llm1_response.clinical_summary
         )
-        
-        if intent == "ANALYZE" and patient_id:
-            job_id = self.job_store.queue_analysis_job(session_id, patient_id)
-            chat_result.job_id = job_id
             
         return chat_result
 
-    def run_background_analysis(self, job_id: str, session_id: str, patient_id: str, clinical_summary: Optional[str] = None):
+    def _run_sync_analysis(self, session_id: str, patient_id: str, clinical_summary: Optional[str] = None) -> Optional[str]:
         """
-        Executes the heavy LLM2 pattern analysis asynchronously.
-        Uses the AnalysisJobStore to ensure only one analysis runs per patient at a time.
+        Executes the heavy LLM2 pattern analysis synchronously and returns the LLM2 generated response.
         """
-        if not self.job_store.acquire_analysis_job(job_id, patient_id):
-            print(f"[Orchestrator] Job {job_id} for {patient_id} could not be acquired (likely concurrent analysis in progress).")
-            return
-            
-        log = get_logger(session_id, "Background Task")
+        session_number = self.session_store.get_session_count(patient_id) if patient_id else 1
+        log = get_logger(session_id, "Sync Analysis Task", session_number)
         try:
             history = self.session_store.get_working_context(session_id, llm_engine=self.llm_provider)
             if clinical_summary and clinical_summary.strip():
@@ -126,10 +131,10 @@ class ConversationOrchestrator:
             llm2_response = self.llm_provider.internal_reasoning(llm2_input)
             log.llm2_output(llm2_response)
             
-            self.profile_store.update_patient_profile(patient_id, llm2_response)
-            self.job_store.complete_analysis_job(job_id)
-            print(f"[Orchestrator] Background analysis completed for patient {patient_id}.")
+            self.profile_store.update_long_term_memory(patient_id, llm2_response)
+            print(f"[Orchestrator] Synchronous analysis completed for patient {patient_id}.")
+            return llm2_response.assistant_message
             
         except Exception as e:
-            print(f"[Orchestrator] Background analysis failed: {e}")
-            self.job_store.fail_analysis_job(job_id)
+            print(f"[Orchestrator] Synchronous analysis failed: {e}")
+            return None

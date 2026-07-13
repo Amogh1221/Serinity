@@ -1,7 +1,7 @@
-import { state } from './state.js';
-import * as api from './api.js';
-import * as ui from './ui.js';
-import * as audio from './audio.js';
+import { state } from './state.js?v=2.0';
+import * as api from './api.js?v=2.0';
+import * as ui from './ui.js?v=2.0';
+import * as audio from './audio.js?v=2.0';
 
 // DOM Elements specific to top-level app logic
 const startButton = document.getElementById("startButton");
@@ -99,6 +99,9 @@ async function showDashboard(pId) {
     
     const list = document.getElementById("dashboardSessionsList");
     list.innerHTML = "";
+
+    const dashStartBtn = document.getElementById("dashboardStartBtn");
+    dashStartBtn.textContent = "NEW SESSION";
     
     if (data.sessions && data.sessions.length > 0) {
       data.sessions.forEach(sess => {
@@ -163,6 +166,12 @@ async function showDashboard(pId) {
   }
 }
 
+/**
+ * Starts a new session for the given patient ID.
+ * Transitions UI to main app and starts session timers.
+ * 
+ * @param {string} pId - The patient ID to start the session for.
+ */
 async function startActualSession(pId) {
   try {
     const data = await api.startSessionReq(pId);
@@ -185,6 +194,12 @@ async function startActualSession(pId) {
   }
 }
 
+/**
+ * Pings the backend to check health and initializes routing based on URL path.
+ * Retries with exponential backoff if backend is not ready.
+ * 
+ * @param {number} retryCount - Number of initialization retries so far.
+ */
 async function initializeSession(retryCount = 0) {
   try {
     await api.pingHealth();
@@ -194,6 +209,33 @@ async function initializeSession(retryCount = 0) {
 
     startButton.disabled = false;
     startButton.textContent = "Start Consultation";
+
+    if (window.location.hash) {
+      const hash = window.location.hash.substring(1); // remove '#'
+      let newPath = "/";
+      if (hash === "profileSelectionScreen") newPath = "/profiles";
+      else if (hash === "dashboardScreen") newPath = "/dashboard";
+      else if (hash === "mainApp") newPath = "/session";
+      
+      if (newPath !== "/") {
+        window.history.replaceState(null, "", newPath);
+      }
+    }
+
+    // Handle deep linking / routing on load
+    const path = window.location.pathname;
+    if (path === "/profiles") {
+      fetchPatients();
+      ui.switchScreen("profileSelectionScreen", false);
+    } else if (path === "/dashboard" || path === "/session") {
+      if (!state.patientId) {
+        // State lost on refresh, redirect back to profiles safely
+        fetchPatients();
+        ui.switchScreen("profileSelectionScreen");
+      } else {
+        ui.switchScreen(path === "/dashboard" ? "dashboardScreen" : "mainApp", false);
+      }
+    }
   } catch (error) {
     console.error(`Backend not ready (attempt ${retryCount + 1}):`, error);
     if (retryCount < 15) {
@@ -212,7 +254,20 @@ function bindEvents() {
     if (event.state && event.state.screen) {
       ui.switchScreen(event.state.screen, false);
     } else {
-      ui.switchScreen("loadingScreen", false);
+      const path = window.location.pathname;
+      if (path === "/profiles") {
+        fetchPatients();
+        ui.switchScreen("profileSelectionScreen", false);
+      } else if (path === "/dashboard" || path === "/session") {
+        if (!state.patientId) {
+          fetchPatients();
+          ui.switchScreen("profileSelectionScreen", false);
+        } else {
+          ui.switchScreen(path === "/dashboard" ? "dashboardScreen" : "mainApp", false);
+        }
+      } else {
+        ui.switchScreen("loadingScreen", false);
+      }
     }
   });
 
@@ -227,13 +282,17 @@ function bindEvents() {
     ui.showConfirm(
       "Reset Profile?",
       "Are you sure you want to reset this profile? All sessions, messages, and analysis will be permanently deleted. The patient record will remain.",
-      () => {
+      async () => {
+        try {
+          await api.resetPatientProfile(state.patientId);
+        } catch (e) {
+          console.error("Error resetting profile:", e);
+        }
         document.getElementById("dashboardSessionsList").innerHTML = `<p class="text-clay text-sm italic">No previous sessions found.</p>`;
         document.getElementById("dashboardDomains").innerHTML = `
           <h3 class="font-utility uppercase text-clay text-sm border-b border-ink/30 pb-2">Clinical Profile</h3>
           <p class="text-clay text-sm italic mt-4">Profile has been reset.</p>
         `;
-        api.resetPatientProfile(state.patientId).catch(e => console.error("Error resetting profile:", e));
       }
     );
   };
@@ -242,12 +301,16 @@ function bindEvents() {
     ui.showConfirm(
       "Delete Profile?",
       "Are you sure you want to completely delete this profile? This action is irreversible and all data will be erased.",
-      () => {
+      async () => {
         const idToDelete = state.patientId;
         state.setPatientId(null);
+        try {
+          await api.deletePatientProfile(idToDelete);
+        } catch (e) {
+          console.error("Error deleting profile:", e);
+        }
         ui.switchScreen("profileSelectionScreen");
         fetchPatients();
-        api.deletePatientProfile(idToDelete).catch(e => console.error("Error deleting profile:", e));
       }
     );
   };
@@ -378,11 +441,11 @@ function bindEvents() {
     try {
       await api.endSessionReq(state.sessionId, state.patientId);
       state.setSessionId(null);
-      location.reload();
+      window.location.href = "/";
     } catch (err) {
       console.error("Failed to end session:", err);
       state.setSessionId(null);
-      location.reload();
+      window.location.href = "/";
     }
   };
 }

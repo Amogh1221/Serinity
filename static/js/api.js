@@ -1,12 +1,12 @@
 export const BACKEND_URL = "";
 
 export async function fetchPatientsList() {
-  const res = await fetch(`${BACKEND_URL}/patients`);
+  const res = await fetch(`${BACKEND_URL}/patients`, { cache: "no-store" });
   return res.json();
 }
 
 export async function loadDashboard(patientId) {
-  const res = await fetch(`${BACKEND_URL}/patients/${patientId}/dashboard`);
+  const res = await fetch(`${BACKEND_URL}/patients/${patientId}/dashboard`, { cache: "no-store" });
   if (!res.ok) throw new Error("Dashboard load failed");
   return res.json();
 }
@@ -75,3 +75,5 @@ export async function endSessionReq(sessionId, patientId) {
     })
   });
 }
+
+

@@ -18,7 +18,18 @@ let typingNode = null;
 
 const screens = ["loadingScreen", "profileSelectionScreen", "dashboardScreen", "mainApp"];
 
+export function getPathForScreen(screen) {
+  const map = {
+    "loadingScreen": "/",
+    "profileSelectionScreen": "/profiles",
+    "dashboardScreen": "/dashboard",
+    "mainApp": "/session"
+  };
+  return map[screen] || "/";
+}
+
 export function switchScreen(targetScreen, pushToHistory = true) {
+  window.currentScreen = targetScreen;
   screens.forEach(s => {
     const el = document.getElementById(s);
     if (el) {
@@ -32,7 +43,7 @@ export function switchScreen(targetScreen, pushToHistory = true) {
   });
 
   if (pushToHistory) {
-    history.pushState({ screen: targetScreen }, "", `/#${targetScreen}`);
+    history.pushState({ screen: targetScreen }, "", getPathForScreen(targetScreen));
   }
 }
 

@@ -35,5 +35,4 @@ class ChatResult(BaseModel):
     assistant_message: str
     intent: str
     risk_flagged: bool
-    job_id: Optional[str] = None
     clinical_summary: Optional[str] = None
