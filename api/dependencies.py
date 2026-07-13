@@ -13,6 +13,7 @@ from providers.chroma_vector_store import ChromaVectorStore
 from persistence.sqlite_memory_store import SQLiteProfileStore, SQLiteSessionStore
 from providers.llm_risk_signal import LLMRiskSignal
 from providers.clinical_risk_signal import ClinicalRiskSignal
+from providers.keyword_risk_signal import KeywordRiskSignal
 from services.risk_assessment_service import RiskAssessmentService
 from services.conversation_orchestrator import ConversationOrchestrator
 from services.patient_service import PatientService
@@ -49,6 +50,7 @@ stt_provider = SenseVoiceSTTProvider()
 
 # Instantiate Risk Service
 risk_service = RiskAssessmentService([
+    KeywordRiskSignal(),
     LLMRiskSignal(),
     ClinicalRiskSignal()
 ])
