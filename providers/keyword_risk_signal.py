@@ -50,6 +50,32 @@ _RISK_PATTERNS = [
     # --- Explicit direct statements ---
     r"\bi (don'?t|do not) (want|deserve) to (live|be alive)\b",
     r"\b(thinking about|thought about) (dying|death|not being here|ending it)\b",
+
+    # --- Farewell / final-arrangement language — a distinct warning-sign
+    #     category in clinical suicide-risk screening (alongside direct
+    #     ideation), not just another phrasing of "I want to die" ---
+    r"\b(this is (my )?goodbye|saying goodbye|say my goodbyes)\b",
+    r"\b(won'?t|wont) be (around|here) (much longer|for long|anymore)\b",
+    r"\b(take care of|look after) (my|the) (dog|cat|kids|children|family)\b.{0,40}\b(when|after) i'?m gone\b",
+    r"\bnot (going to|gonna) be (a problem|around) (for )?much longer\b",
+    r"\bwon'?t (have to|need to) worry about me (much longer|soon|anymore)\b",
+
+    # --- Burden language — very common phrasing in real disclosures ---
+    r"\b(such a |such)?burden (to|on) (everyone|my family|everybody|people)\b",
+    r"\btired of being a burden\b",
+
+    # --- Evasive slang / obfuscated spellings, used specifically to get
+    #     past literal-word filters — worth matching for exactly that reason ---
+    r"\b(kms|kys)\b",
+    r"\bunaliv(e|ing|ed)\b",
+    r"\bsewerslide\b",                    # documented deliberate misspelling of "suicide"
+
+    # --- Planning / preparation and access to means, kept at the level of
+    #     intent-language rather than naming specific objects, so this adds
+    #     coverage without turning into a methods list ---
+    r"\b(have a plan|got a plan)\b",
+    r"\b(pills|gun|rope|knife)\s+ready\b",
+    r"\b(have|got|access to) (the means|a way) to (do it|end (it|things|my life))\b",
 ]
 
 _COMPILED = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _RISK_PATTERNS]

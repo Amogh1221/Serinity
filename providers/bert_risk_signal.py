@@ -25,11 +25,13 @@ class BertRiskSignal:
             
         try:
             result = self.classifier(message)
-            # Example result format from this model: [{'label': 'suicide', 'score': 0.99}]
             label = result[0]['label'].lower()
+            score = result[0]['score']
             
-            # If the model explicitly flags it as suicide
-            if "non" not in label and "suicide" in label:
+            logger.info(f"BERT raw output for '{message}': {label} (score: {score:.3f})")
+            
+            # Outputs 'label_1' for suicide/risk & 'label_0' for non-suicide
+            if "label_1" in label:
                 return True
                 
             return False

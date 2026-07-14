@@ -38,6 +38,13 @@ class PatientService:
         """
         self.session_store.end_session(session_id)
 
+    def get_active_session(self, patient_id: str) -> Optional[str]:
+        """Check if the patient currently has an active session."""
+        return self.session_store.get_active_session(patient_id)
+
+    def get_session_messages(self, session_id: str) -> list[dict]:
+        """Retrieve all raw messages for a given session."""
+        return self.session_store.get_all_messages(session_id)
     def reset_patient_data(self, patient_id: str) -> None:
         """
         Resets the patient's data, including sessions, messages, and profile.
@@ -57,14 +64,22 @@ class PatientService:
         patient_id = self.session_store.get_patient_id(session_id) or default_patient_id
 
         history = self.session_store.get_working_context(session_id)
+        
+        # Check if the user actually sent any messages
+        has_user_messages = any(msg.get("role") == "user" for msg in history)
+        
         summary = "No conversation occurred."
-        if len(history) > 1 and patient_id:
+        if has_user_messages and patient_id:
             try:
                 old_profile = self.profile_store.get_patient_profile(patient_id)
                 llm3_output = self.llm_provider.generate_end_of_session_profile(old_profile, history)
-                summary = llm3_output.session_summary
-                self.profile_store.update_patient_profile(patient_id, llm3_output)
-                self.profile_store.update_long_term_memory(patient_id, llm3_output)
+                
+                if not llm3_output.update_profile:
+                    summary = "Not enough conversation to generate a meaningful summary."
+                else:
+                    summary = llm3_output.session_summary
+                    self.profile_store.update_patient_profile(patient_id, llm3_output)
+                    self.profile_store.update_long_term_memory(patient_id, llm3_output)
             except Exception as e:
                 summary = f"Summary generation failed: {e}"
 
@@ -93,3 +108,9 @@ class PatientService:
                 self.end_session(session_id)
             except Exception as e:
                 print(f"[PatientService] Failed to sweep session {session_id}: {e}")
+
+    def get_active_session(self, patient_id: str) -> Optional[str]:
+        return self.session_store.get_active_session(patient_id)
+
+    def get_session_messages(self, session_id: str) -> list[dict]:
+        return self.session_store.get_all_messages(session_id)

@@ -76,4 +76,12 @@ export async function endSessionReq(sessionId, patientId) {
   });
 }
 
+export async function getActiveSession(patientId) {
+  const res = await fetch(`${BACKEND_URL}/patients/${patientId}/active_session`, { cache: "no-store" });
+  return res.json();
+}
 
+export async function getSessionMessages(sessionId) {
+  const res = await fetch(`${BACKEND_URL}/sessions/${sessionId}/messages`, { cache: "no-store" });
+  return res.json();
+}

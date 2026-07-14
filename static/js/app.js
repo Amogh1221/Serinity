@@ -50,6 +50,11 @@ async function sendTextMessage(message, emotion = null) {
   try {
     const data = await api.sendChatText(state.sessionId, state.patientId, message, emotion);
     ui.removeTyping();
+    
+    if (data.session_id && data.session_id !== state.sessionId) {
+      state.setSessionId(data.session_id);
+    }
+    
     await handleAssistantResponses(data.assistant_message);
 
     if (data.risk_flagged) {
@@ -179,6 +184,7 @@ async function startActualSession(pId) {
     state.setPatientId(data.patient_id);
 
     ui.switchScreen("mainApp");
+    document.getElementById("chat").innerHTML = "";
 
     state.sessionStartTime = Date.now();
     state.exchangeCount = 0;
@@ -190,6 +196,42 @@ async function startActualSession(pId) {
   } catch (e) {
     console.error("Failed to start session:", e);
     alert("Failed to start session. Please try again.");
+    location.reload();
+  }
+}
+
+/**
+ * Resumes an existing active session.
+ */
+async function continueActualSession(sessionId) {
+  try {
+    state.setSessionId(sessionId);
+    ui.switchScreen("mainApp");
+    
+    document.getElementById("chat").innerHTML = "";
+    
+    const data = await api.getSessionMessages(sessionId);
+    if (data.messages) {
+      data.messages.forEach(msg => {
+        if (msg.role !== "system") {
+          if (msg.role === 'assistant') {
+            const parts = msg.content.split("&&").map(p => p.trim()).filter(Boolean);
+            parts.forEach(part => ui.addMessage(part, 'assistant'));
+          } else {
+            ui.addMessage(msg.content, msg.role);
+          }
+        }
+      });
+    }
+
+    state.sessionStartTime = Date.now(); 
+    state.exchangeCount = Math.floor((data.messages || []).length / 2);
+    ui.updateSessionStats();
+    if (state.sessionInterval) clearInterval(state.sessionInterval);
+    state.sessionInterval = setInterval(ui.updateSessionStats, 60000);
+  } catch (e) {
+    console.error("Failed to continue session:", e);
+    alert("Failed to continue session. Please try again.");
     location.reload();
   }
 }
@@ -316,10 +358,41 @@ function bindEvents() {
   };
 
   document.getElementById("dashboardStartBtn").onclick = async () => {
-    ui.switchScreen("loadingScreen");
-    startButton.textContent = "Loading Session...";
+    ui.switchScreen("loadingScreen", false);
+    startButton.textContent = "Checking Session...";
     startButton.disabled = true;
-    await startActualSession(state.patientId);
+
+    try {
+      const active = await api.getActiveSession(state.patientId);
+      if (active && active.session_id) {
+        ui.switchScreen("dashboardScreen");
+        const modal = document.getElementById("continueSessionModal");
+        modal.style.display = "flex";
+
+        document.getElementById("continueSessionBtn").onclick = async () => {
+          modal.style.display = "none";
+          ui.switchScreen("loadingScreen", false);
+          startButton.textContent = "Resuming Session...";
+          await continueActualSession(active.session_id);
+        };
+
+        document.getElementById("endAndStartNewBtn").onclick = async () => {
+          modal.style.display = "none";
+          ui.switchScreen("loadingScreen", false);
+          startButton.textContent = "Loading Session...";
+          state.setSessionId(null);
+          await api.endSessionReq(active.session_id, state.patientId);
+          await startActualSession(state.patientId);
+        };
+      } else {
+        startButton.textContent = "Loading Session...";
+        await startActualSession(state.patientId);
+      }
+    } catch (e) {
+      console.error(e);
+      startButton.textContent = "Loading Session...";
+      await startActualSession(state.patientId);
+    }
   };
 
   document.getElementById("selectProfileBtn").onclick = async () => {

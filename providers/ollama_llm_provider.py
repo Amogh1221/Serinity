@@ -1,4 +1,5 @@
 import os
+import threading
 import ollama
 from core.ports import LLM1Output, LLM2Output, LLM3Output
 from core.prompts import LLM1_SYSTEM_PROMPT, LLM2_SYSTEM_PROMPT, LLM3_SYSTEM_PROMPT
@@ -13,6 +14,8 @@ class OllamaLLMProvider:
         self.host = host
         self.model1 = model1
         self.model2 = model2
+        # Global lock to queue requests and prevent CUDA out-of-memory errors
+        self._llm_lock = threading.Lock()
         
     def _client(self):
         return ollama.Client(host=self.host)
@@ -49,12 +52,13 @@ class OllamaLLMProvider:
             for m in context:
                 messages.append({"role": m["role"], "content": m["content"]})
 
-            response = self._client().chat(
-                model=self.model1,
-                messages=messages,
-                format=LLM1Output.model_json_schema(),
-                options={"temperature": 0.6, "num_predict": 1024},
-            )
+            with self._llm_lock:
+                response = self._client().chat(
+                    model=self.model1,
+                    messages=messages,
+                    format=LLM1Output.model_json_schema(),
+                    options={"temperature": 0.6, "num_predict": 1024},
+                )
             raw = response.message.content
             return LLM1Output.model_validate_json(raw)
         except Exception as e:
@@ -72,13 +76,14 @@ class OllamaLLMProvider:
             for m in context:
                 messages.append({"role": m["role"], "content": m["content"]})
 
-            response = self._client().chat(
-                model=self.model2,
-                messages=messages,
-                format=LLM2Output.model_json_schema(),
-                options={"temperature": 0.1, "num_predict": 1024},
-                keep_alive=0,
-            )
+            with self._llm_lock:
+                response = self._client().chat(
+                    model=self.model2,
+                    messages=messages,
+                    format=LLM2Output.model_json_schema(),
+                    options={"temperature": 0.1, "num_predict": 1024},
+                    keep_alive=0,
+                )
             raw = response.message.content
             return LLM2Output.model_validate_json(raw)
         except Exception as e:
@@ -107,11 +112,12 @@ class OllamaLLMProvider:
             for m in context:
                 messages.append({"role": m["role"], "content": m["content"]})
 
-            response = self._client().chat(
-                model=self.model1,
-                messages=messages,
-                options={"temperature": 0.5, "num_predict": 512},
-            )
+            with self._llm_lock:
+                response = self._client().chat(
+                    model=self.model1,
+                    messages=messages,
+                    options={"temperature": 0.5, "num_predict": 512},
+                )
             return response.message.content.strip()
         except Exception as e:
             print(f"[QUERY ERROR] {e}")
@@ -130,12 +136,13 @@ class OllamaLLMProvider:
                 {"role": "user", "content": user_prompt}
             ]
 
-            response = self._client().chat(
-                model=self.model2,
-                messages=messages,
-                format=LLM3Output.model_json_schema(),
-                options={"temperature": 0.2, "num_predict": 1500},
-            )
+            with self._llm_lock:
+                response = self._client().chat(
+                    model=self.model2,
+                    messages=messages,
+                    format=LLM3Output.model_json_schema(),
+                    options={"temperature": 0.2, "num_predict": 1500},
+                )
             raw = response.message.content
             return LLM3Output.model_validate_json(raw)
         except Exception as e:
@@ -171,11 +178,12 @@ class OllamaLLMProvider:
                 },
                 {"role": "user", "content": formatted},
             ]
-            response = self._client().chat(
-                model=self.model1,
-                messages=messages,
-                options={"temperature": 0.3, "num_predict": 300},
-            )
+            with self._llm_lock:
+                response = self._client().chat(
+                    model=self.model1,
+                    messages=messages,
+                    options={"temperature": 0.3, "num_predict": 300},
+                )
             return response.message.content.strip()
         except Exception as e:
             print(f"[SUMMARIZE ERROR] {e}")

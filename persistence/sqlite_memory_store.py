@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional, Any
 from core.ports import LLM2Output, LLMProvider
@@ -12,11 +13,21 @@ class SQLiteBaseStore:
         self.db_path = db_path
         self._init_db()
 
-    def _get_conn(self) -> sqlite3.Connection:
+    @contextmanager
+    def _get_conn(self):
+        """
+        Yields a short-lived SQLite connection wrapped in a transaction block.
+        Ensures the connection is properly closed to prevent file descriptor/memory leaks.
+        """
         os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
         conn = sqlite3.connect(self.db_path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            # The inner 'with conn:' handles committing or rolling back the transaction
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_db(self):
         with self._get_conn() as conn:
@@ -319,7 +330,22 @@ class SQLiteSessionStore(SQLiteBaseStore):
                 (self._now(), session_id),
             )
 
-    def _get_all_messages(self, session_id: str) -> list[dict]:
+    def get_active_session(self, patient_id: str) -> Optional[str]:
+        with self._get_conn() as conn:
+            row = conn.execute(
+                "SELECT session_id FROM sessions WHERE patient_id=? AND is_active=1 ORDER BY created_at DESC LIMIT 1",
+                (patient_id,)
+            ).fetchone()
+        return row["session_id"] if row else None
+
+    def end_session(self, session_id: str) -> None:
+        with self._get_conn() as conn:
+            conn.execute(
+                "UPDATE sessions SET is_active=0 WHERE session_id=?",
+                (session_id,)
+            )
+
+    def get_all_messages(self, session_id: str) -> list[dict]:
         with self._get_conn() as conn:
             rows = conn.execute(
                 "SELECT role, content FROM messages WHERE session_id=? ORDER BY id",
@@ -344,7 +370,7 @@ class SQLiteSessionStore(SQLiteBaseStore):
             )
 
     def get_working_context(self, session_id: str, llm_engine: Optional[LLMProvider] = None) -> list:
-        all_msgs = self._get_all_messages(session_id)
+        all_msgs = self.get_all_messages(session_id)
         if len(all_msgs) <= self.working_memory_turns:
             return all_msgs
 

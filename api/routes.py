@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Request, Response, BackgroundTasks
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -124,13 +125,11 @@ def chat_text(
     LLM2 analysis is run synchronously within the orchestrator if triggered.
     """
     if not session_store.session_exists(request.session_id):
+        # Session expired, create a new one
         session_id, opening_message, patient_id = patient_service.create_new_session(request.patient_id)
-        return {
-            "assistant_message": opening_message,
-            "session_id":        session_id,
-            "patient_id":        patient_id,
-            "intent":            "CONTINUE",
-        }
+        # Instead of dropping the user's message and returning the greeting, pipe the user's message into the new session
+        request.session_id = session_id
+        request.patient_id = patient_id
 
     chat_result = orchestrator.handle_message(
         session_id=request.session_id,
@@ -144,6 +143,7 @@ def chat_text(
         "assistant_message": chat_result.assistant_message,
         "intent":            chat_result.intent,
         "risk_flagged":      chat_result.risk_flagged,
+        "session_id":        request.session_id,
     }
 
 @router.post("/transcribe")
@@ -156,12 +156,31 @@ async def transcribe(
     for speech-to-text and emotional tone extraction.
     """
     audio_bytes = await audio.read()
-    result = stt_provider.transcribe(audio_bytes)
+    # Run the CPU-bound transcription in a threadpool to prevent blocking the async event loop
+    result = await run_in_threadpool(stt_provider.transcribe, audio_bytes)
     return {
         "text":    result.get("text",    ""),
         "emotion": result.get("emotion", "unknown"),
         "event":   result.get("event",   None),
     }
+
+@router.get("/patients/{patient_id}/active_session")
+def get_active_session(
+    patient_id: str,
+    patient_service: PatientService = Depends(get_patient_service)
+):
+    """Check if the patient currently has an active session."""
+    session_id = patient_service.get_active_session(patient_id)
+    return {"session_id": session_id}
+
+@router.get("/sessions/{session_id}/messages")
+def get_session_messages(
+    session_id: str,
+    patient_service: PatientService = Depends(get_patient_service)
+):
+    """Retrieve all raw messages for a given session to continue a chat."""
+    messages = patient_service.get_session_messages(session_id)
+    return {"messages": messages}
 
 @router.get("/{full_path:path}", response_class=HTMLResponse)
 def catch_all(request: Request, full_path: str):

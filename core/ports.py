@@ -33,6 +33,7 @@ class LLM3Output(BaseModel):
     Used for summarizing the session and merging the clinical profile.
     """
     session_summary: str
+    update_profile: bool
     emotional_themes: List[str]
     thinking_patterns: List[str]
     behavioral_patterns: List[str]
@@ -127,6 +128,12 @@ class SessionStore(Protocol):
         ...
     def get_session_count(self, patient_id: str) -> int:
         """Get the total number of sessions for a given patient."""
+        ...
+        
+    def get_active_session(self, patient_id: str) -> Optional[str]:
+        ...
+        
+    def get_all_messages(self, session_id: str) -> list[dict]:
         ...
 
 class ProfileStore(Protocol):

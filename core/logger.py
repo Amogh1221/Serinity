@@ -124,12 +124,6 @@ class DebugLogger:
             "risk_assessment":       llm2_response.risk_assessment,
         })
 
-    def llm1_final(self, llm1_output):
-        """Log LLM1's post-analysis synthesis response."""
-        self._write_jsonl("llm1_final", {
-            "turn":    self._turn,
-            "message": llm1_output.assistant_message,
-        })
 
     def llm3_output(self, llm3_response):
         """Log the full post-session LLM3 analysis."""

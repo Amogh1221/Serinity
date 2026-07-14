@@ -260,6 +260,23 @@
     </div>
   </div>
 
+  <!-- Continue Session Modal -->
+  <div id="continueSessionModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-[60] flex flex-col items-center justify-center p-4 fade-in">
+    <div class="bg-paper border border-signal p-8 max-w-sm w-full shadow-lg">
+      <h2 class="text-xl font-display text-signal mb-2">Active Session Found</h2>
+      <p class="text-clay text-sm mb-6">You have a previous session that is still open. Would you like to pick up where you left off, or end it and start a new one?</p>
+      
+      <div class="flex flex-col gap-3">
+        <button id="continueSessionBtn" class="w-full bg-signal text-paper hover:bg-signal/80 transition py-2 font-utility uppercase tracking-widest text-sm">
+          Continue Session
+        </button>
+        <button id="endAndStartNewBtn" class="w-full bg-transparent border border-ink text-ink hover:bg-ink hover:text-paper transition py-2 font-utility uppercase tracking-widest text-sm">
+          End & Start New
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script type="module" src="/static/js/app.js?v=2.0"></script>
 </body>
 </html>
