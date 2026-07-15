@@ -168,12 +168,12 @@
   <!-- Main App (Hidden Initially) -->
   <div id="mainApp" style="display: none;" class="flex flex-col h-screen">
     <!-- Header -->
-    <header class="bg-paper border-b border-ink z-10 py-2 md:py-3">
-      <div class="w-full px-4 md:px-12 mx-auto flex items-center justify-between gap-2">
+    <header class="bg-paper border-b border-ink sticky top-0 z-50 py-2 md:py-3 shadow-sm">
+      <div class="w-full px-3 md:px-12 mx-auto flex items-center justify-between gap-1 md:gap-2">
         
         <!-- Left: Logo & Title -->
         <div class="flex items-center gap-2 md:gap-4 shrink-0 min-w-0">
-          <img src="/static/icons/logo.svg" alt="Serinity Logo" class="w-8 h-8 md:w-10 md:h-10 opacity-90 shrink-0" />
+          <img src="/static/icons/logo.svg" alt="Serinity Logo" class="w-8 h-8 md:w-10 md:h-10 opacity-90 shrink-0">
           <div class="flex flex-col justify-center min-w-0">
             <h1 class="text-xl md:text-3xl font-display text-ink leading-none truncate" id="headerName">Serinity</h1>
             <p class="text-[10px] md:text-xs font-utility text-clay tracking-widest uppercase mt-0.5 truncate hidden sm:block">Clinical Session</p>
@@ -186,10 +186,34 @@
           
           <select 
             id="voiceSelect" 
-            class="bg-paper border border-ink text-ink text-xs md:text-sm font-utility px-2 py-1.5 outline-none focus:border-moss w-[110px] sm:w-[180px] md:w-[220px] cursor-pointer hover:bg-ink/5 truncate"
+            class="bg-paper border border-ink text-ink text-xs md:text-sm font-utility px-1 py-1.5 outline-none focus:border-moss w-[70px] sm:w-[140px] md:w-[200px] cursor-pointer hover:bg-ink/5 truncate shrink-0"
           >
             <option value="">Voice: Off</option>
           </select>
+
+          <!-- Mobile Slider Toggle -->
+          <label class="flex sm:hidden items-center cursor-pointer gap-1.5 shrink-0" title="Toggle Audio Response">
+            <div class="relative flex items-center">
+              <input type="checkbox" id="audioOutputToggleMobile" class="sr-only">
+              <div id="audioToggleTrack" class="block bg-ink/30 w-10 h-6 rounded-full transition-colors duration-200"></div>
+              <div id="audioToggleDot" class="dot absolute left-1 top-1 bg-paper w-4 h-4 rounded-full transition-transform duration-200"></div>
+            </div>
+            <svg id="audioToggleIconMobile" class="w-4 h-4 text-ink/50 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M17.95 6.05a8 8 0 010 11.9M6.5 8.5H4a1 1 0 00-1 1v5a1 1 0 001 1h2.5l4 4V4.5l-4 4z"></path>
+            </svg>
+          </label>
+
+          <!-- Desktop Button Toggle -->
+          <button 
+            id="audioOutputToggleDesktop" 
+            class="hidden sm:flex border border-ink text-ink hover:bg-moss hover:border-moss hover:text-paper transition-all items-center justify-center px-2 py-1.5 md:px-3 shrink-0 gap-1"
+            title="Toggle Audio Response"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M17.95 6.05a8 8 0 010 11.9M6.5 8.5H4a1 1 0 00-1 1v5a1 1 0 001 1h2.5l4 4V4.5l-4 4z"></path>
+            </svg>
+            <span class="text-xs font-utility uppercase tracking-wide" id="audioToggleLabelDesktop">Audio Off</span>
+          </button>
 
           <button 
             id="endSessionBtn" 
@@ -225,12 +249,13 @@
           <button 
             id="micBtn" 
             class="w-14 h-14 border border-ink rounded-full flex items-center justify-center transition-all duration-200 hover:bg-moss hover:border-moss hover:text-paper group text-ink"
+            style="touch-action: none;"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
             </svg>
           </button>
-          <p id="status" class="text-xs font-utility text-clay uppercase tracking-widest">Tap mic or hold Space</p>
+          <p id="status" class="text-xs font-utility text-clay uppercase tracking-widest">Hold Space to speak</p>
         </div>
 
         <!-- Text Input -->
@@ -286,6 +311,6 @@
     </div>
   </div>
 
-  <script type="module" src="/static/js/app.js?v=2.0"></script>
+  <script type="module" src="/static/js/app.js?v=28.0"></script>
 </body>
 </html>

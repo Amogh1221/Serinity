@@ -1,7 +1,7 @@
 import { state } from './state.js';
 
 // Cache DOM elements that exist on load
-export const uiElements = {
+const uiElements = {
   chat: document.getElementById("chat"),
   chatWrapper: document.getElementById("chatWrapper"),
   statusText: document.getElementById("status"),

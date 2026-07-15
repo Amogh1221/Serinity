@@ -6,6 +6,9 @@ let systemVoices = [];
 let mediaRecorder = null;
 let audioChunks = [];
 
+// Keep a global reference so Chrome doesn't garbage-collect the utterance mid-speech
+let currentUtterance = null;
+
 export function loadVoices() {
   const voiceSelect = document.getElementById("voiceSelect");
   if (!voiceSelect) return;
@@ -13,16 +16,19 @@ export function loadVoices() {
   systemVoices = window.speechSynthesis.getVoices();
   voiceSelect.innerHTML = "";
 
+  // Add a reliable default option that doesn't force a specific voice object
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Default OS Voice (Reliable)";
+  defaultOption.selected = true;
+  voiceSelect.appendChild(defaultOption);
+
   const englishVoices = systemVoices.filter(v => v.lang.includes('en'));
 
   englishVoices.forEach(voice => {
     const option = document.createElement("option");
     option.value = voice.name;
-    option.textContent = `${voice.name} (${voice.lang})`;
-
-    if (voice.name.includes("Google US English") || voice.name.includes("Microsoft Zira") || voice.name.includes("Samantha")) {
-      option.selected = true;
-    }
+    option.textContent = `${voice.name} (${voice.localService ? 'Local' : 'Network'})`;
     voiceSelect.appendChild(option);
   });
 }
@@ -31,81 +37,130 @@ if (window.speechSynthesis.onvoiceschanged !== undefined) {
   window.speechSynthesis.onvoiceschanged = loadVoices;
 }
 
+/**
+ * Speak text using the browser's SpeechSynthesis API.
+ * Only speaks if audio output is enabled (state.isAudioOutputEnabled).
+ * This is independent of input mode (text vs voice).
+ */
 export function speak(text) {
   return new Promise((resolve) => {
-    if (!state.isVoiceMode) {
+    if (!state.isAudioOutputEnabled) {
       resolve();
       return;
     }
 
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+    // Ensure voices are loaded
+    if (systemVoices.length === 0) {
+      systemVoices = window.speechSynthesis.getVoices();
+    }
+
+    // Strip markdown symbols before speaking
+    const cleanText = text.replace(/[*_~`#]/g, '').replace(/\[.*?\]/g, '').replace(/\(.*?\)/g, '').trim();
+    if (!cleanText) {
+      console.warn("TTS Skipped: Text was empty after stripping markdown");
+      resolve();
+      return;
     }
 
     setStatusText("Assistant is responding...");
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Keep it simple — exactly like the working test page.
+    // No cancel(), no setTimeout. Just create and speak.
+    currentUtterance = new SpeechSynthesisUtterance(cleanText);
+
+    // Select voice
     const voiceSelect = document.getElementById("voiceSelect");
     const selectedVoiceName = voiceSelect ? voiceSelect.value : "";
-    let preferredVoice = systemVoices.find(v => v.name === selectedVoiceName);
-
-    if (!preferredVoice) {
-      preferredVoice = systemVoices.find(v => v.lang.includes('en') && (v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Samantha'))) || systemVoices.find(v => v.lang.includes('en'));
+    
+    // Only set the voice if the user explicitly selected one of the specific named voices.
+    // Otherwise, leave it undefined so the browser uses its ultra-reliable native default.
+    if (selectedVoiceName !== "") {
+      const preferredVoice = systemVoices.find(v => v.name === selectedVoiceName);
+      if (preferredVoice) {
+        currentUtterance.voice = preferredVoice;
+      }
     }
+    currentUtterance.rate = 1.0;
+    currentUtterance.pitch = 1.0;
+    currentUtterance.volume = 1.0;
 
-    if (preferredVoice) utterance.voice = preferredVoice;
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-
-    utterance.onstart = () => {
+    currentUtterance.onstart = () => {
       state.isAISpeaking = true;
-      setStatusText("Assistant is speaking...");
+      setStatusText("Assistant is speaking... (Audio Started)");
     };
 
-    utterance.onend = () => {
+    currentUtterance.onend = () => {
       state.isAISpeaking = false;
-      setStatusText("Tap the microphone or hold Space to speak");
+      setStatusText(state.isVoiceMode ? "Hold Space to speak" : "Type your message");
       resolve();
     };
 
-    utterance.onerror = (e) => {
+    currentUtterance.onerror = (e) => {
+      console.error("TTS error:", e.error);
       state.isAISpeaking = false;
-      console.error("Browser TTS Error:", e);
-      setStatusText("Tap the microphone or hold Space to speak");
+      setStatusText(`TTS Error: ${e.error}`);
+      setTimeout(() => {
+        setStatusText(state.isVoiceMode ? "Hold Space to speak" : "Type your message");
+      }, 3000);
       resolve();
     };
 
-    window.speechSynthesis.speak(utterance);
-
-    // Safety fallback
-    const wordCount = text.split(/\s+/).length;
-    const timeoutMs = Math.max(3000, wordCount * 600);
+    setStatusText("Attempting to speak...");
+    
+    // Fallback timeout in case onstart/onend never fire
     setTimeout(() => {
-      state.isAISpeaking = false;
-      resolve();
-    }, timeoutMs);
+      if (state.isAISpeaking) {
+         // It started, but maybe stuck?
+      } else {
+         setStatusText("Audio failed to start (Timeout)");
+         setTimeout(() => {
+            setStatusText(state.isVoiceMode ? "Hold Space to speak" : "Type your message");
+         }, 3000);
+         resolve();
+      }
+    }, 4000);
+
+    window.speechSynthesis.speak(currentUtterance);
   });
 }
 
 /**
  * Starts recording the user's voice via MediaRecorder.
- * When recording is stopped, the audio blob is sent to the backend for transcription.
- * 
- * @param {Function} onTranscriptionDone - Callback fired with the transcribed text and extracted emotion.
+ * Called only via spacebar hold.
  */
 export async function startRecording(onTranscriptionDone) {
+  if (state.isRecordingPending || state.isListening) return;
+  state.isRecordingPending = true;
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    
+    // If user released space before mic permission was granted
+    if (!state.isRecordingPending) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+
     mediaRecorder = new MediaRecorder(stream);
     audioChunks = [];
 
     mediaRecorder.ondataavailable = (event) => {
-      audioChunks.push(event.data);
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
     };
 
     mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      // Stop all mic tracks immediately
+      stream.getTracks().forEach(track => track.stop());
+
+      const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
       
+      if (audioBlob.size < 100) {
+        setStatusText("Recording was too short. Hold Space longer.");
+        return;
+      }
+
       setStatusText("Transcribing your voice...");
       addTyping(true, "Transcribing...");
 
@@ -121,26 +176,39 @@ export async function startRecording(onTranscriptionDone) {
       } catch (e) {
         removeTyping();
         console.error("Transcription failed", e);
-        setStatusText("Tap to try again");
+        setStatusText("Hold Space to try again");
       }
     };
 
     mediaRecorder.start();
     state.isListening = true;
+    state.isRecordingPending = false;
     toggleMicButtonVisuals(true);
-    setStatusText("Listening... (tap again to stop)");
+    setStatusText("Listening... (release Space to stop)");
   } catch (err) {
     console.error("Microphone access denied", err);
     setStatusText("Microphone access denied");
+    state.isRecordingPending = false;
   }
 }
 
 export function stopRecording() {
+  state.isRecordingPending = false;
+  
   if (mediaRecorder && state.isListening) {
-    mediaRecorder.stop();
+    try {
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+    } catch(e) {
+      console.error("Error stopping media recorder", e);
+    }
+    
     state.isListening = false;
     toggleMicButtonVisuals(false);
     setStatusText("Processing...");
-    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+  } else {
+    state.isListening = false;
+    toggleMicButtonVisuals(false);
   }
 }
