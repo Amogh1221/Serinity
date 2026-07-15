@@ -53,8 +53,28 @@ Serinity solves this by operating as a **Local-First, Multi-Agent System**:
 3. **Environment Variables:**
    Create a `.env` file in the root directory. You do *not* need an API key for the core local features, but ensure the following are set if testing the optional cloud fallbacks:
    ```env
-   # Keep empty for 100% local usage
-   GOOGLE_API_KEY="" 
+  # Ollama local inference
+OLLAMA_HOST=http://localhost:11434
+LLM1_MODEL=phi4-mini
+LLM2_MODEL=qwen2.5:7b-instruct
+EMBEDDING_MODEL=nomic-embed-text
+
+# HuggingFace model cache — store inside the project so everything is self-contained
+HF_HOME=./models
+
+# ChromaDB local vector store
+CHROMA_PERSIST_DIR=./chroma_db
+CHROMA_COLLECTION_NAME=mhcva-knowledge
+
+# SQLite memory store
+MEMORY_DB_PATH=./data/seren.db
+
+# Debug logs directory
+LOG_DIR=./logs
+
+# Working memory window (number of raw turns to keep in active context)
+WORKING_MEMORY_TURNS=20
+ 
    ```
 
 ---

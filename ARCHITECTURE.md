@@ -77,14 +77,12 @@ Serinity replaces the traditional single-prompt chatbot approach with a **Multi-
 
 Serinity is **100% Local-First**.
 
-| Component | Technology | Execution Environment |
-| :--- | :--- | :--- |
-| **Frontend UI** | Vanilla HTML, CSS, JavaScript | Local Browser (localhost:8000) |
-| **Backend API** | Python, FastAPI | Local Server (localhost:8000) |
-| **Speech-to-Text** | SenseVoice | Local Device |
-| **LLM Inference** | Ollama (Qwen2.5 7B) | Local Device (CPU/GPU/NPU) |
-| **Embeddings** | Nomic-Embed-Text | Local Device |
-| **Vector Database**| ChromaDB | Local File System |
-| **Patient Data** | JSON / TXT | Local File System |
-
-*No data is transmitted to OpenAI, Google, Anthropic, or any third-party server during normal operation.*
+| Component           | Technology                    | Execution Environment          |
+| :--------------------| :------------------------------| :-------------------------------|
+| **Frontend UI**     | Vanilla HTML, CSS, JavaScript | Local Browser (localhost:8000) |
+| **Backend API**     | Python, FastAPI               | Local Server (localhost:8000)  |
+| **Speech-to-Text**  | SenseVoice                    | Local Device                   |
+| **LLM Inference**   | Ollama (Qwen2.5 7B)           | Local Device (CPU/GPU/NPU)     |
+| **Embeddings**      | Nomic-Embed-Text              | Local Device                   |
+| **Vector Database** | ChromaDB                      | Local File System              |
+| **Patient Data**    | JSON / TXT                    | Local File System              |
