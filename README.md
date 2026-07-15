@@ -2,6 +2,11 @@
 
 **Serinity** is an offline-first, highly empathetic Conversational AI system designed to conduct rigorous clinical interviews, track mental health trajectories over time, and provide emotional support—all while ensuring 100% data privacy by running entirely on-device.
 
+## Screenshots
+![Conversation](icons/conversation.png)
+![Patient Profile](icons/profile.png)
+![Terminal](icons/terminal.png)
+
 ###  [Demo Video Placeholder]
 *(Insert YouTube/Loom Link Here - 2-3 minutes showing the problem, solution, and on-device AI working)*
 
