@@ -1,48 +1,75 @@
-# Serinity Technical & Evaluation Report
+<div align="center">
+  <h1>⚙️ Serinity Technical & Evaluation Report</h1>
+  <p><i>A deep dive into the engineering, performance, and scientific evaluation of the Serinity offline-first architecture.</i></p>
+</div>
 
-This report outlines the technical specifications, evaluation methodologies, privacy protocols, and attributions for the Serinity AI system.
+---
 
-## 1. Technical Specifications & Hardware
+## 💻 1. Technical Specifications & Hardware
 
-Serinity is heavily optimized to run on consumer hardware without relying on cloud APIs.
+Serinity is engineered to democratize access to advanced clinical AI. By leveraging aggressive quantization and small, highly efficient models, the entire pipeline runs locally on standard consumer hardware.
 
-- **Core LLM**: Qwen2.5 (7B parameters, Instruct fine-tune)
-- **Quantization**: 4-bit quantization (via Ollama Q4_K_M) to reduce VRAM requirements while maintaining conversational coherence.
-- **Embedding Model**: Nomic-Embed-Text (nomic-ai/nomic-embed-text-v1.5)
-- **Speech-to-Text**: SenseVoice (Small/Fast variant for real-time transcription)
-- **Runtime Environment**: Ollama (LLM/Embeddings) and Python/FastAPI (Orchestration)
-- **Peak Memory Usage**: ~5.5 GB VRAM (allowing it to run on standard 8GB consumer GPUs or unified Apple Silicon memory).
-- **Inference Latency**: Average time-to-first-token (TTFT) is < 1.5 seconds on a standard M-series Mac or Nvidia RTX 3060.
+### 🛠️ The Tech Stack
+| Component | Technology / Model | Purpose |
+| :--- | :--- | :--- |
+| **Core LLM** | `Qwen2.5 (7B parameters)` | Instruct fine-tuned for high-reasoning clinical dialogue. |
+| **Quantization** | `4-bit (Q4_K_M)` | Reduces VRAM footprint via Ollama without sacrificing coherence. |
+| **Embedding Model** | `nomic-embed-text-v1.5` | Generates semantic vectors for the RAG pipeline. |
+| **Speech-to-Text** | `SenseVoice (Small)` | Lightning-fast, on-device audio transcription. |
+| **Runtime & API** | `Ollama` + `FastAPI` | Orchestration and model serving. |
 
-## 2. Local AI Verification & Privacy
+### ⚡ Performance Benchmarks
+> **Peak Memory Usage:** `~5.5 GB VRAM`
+> *Allows Serinity to run comfortably on an entry-level 8GB consumer GPU (e.g., Nvidia RTX 3060) or an Apple Silicon Mac.*
 
-The core value proposition of Serinity is absolute data sovereignty.
+> **Inference Latency:** `< 1.5 seconds`
+> *Average Time-To-First-Token (TTFT), ensuring a seamless conversational flow with the patient.*
 
-- **What runs locally?** 100% of the core pipeline runs on-device. This includes Speech-to-Text (SenseVoice), all 3 Agentic LLMs (Qwen2.5 via Ollama), and the Vector Database (ChromaDB). 
-- **What requires the internet?** The system operates fully offline. Internet is only required during the initial installation to pull the Docker-like model weights via Ollama and `pip install` dependencies.
-- **Where is data stored?** All patient profiles, chat transcripts, and audio blobs are stored locally in the `/data` and `/logs` directories on the user's hard drive. No telemetry, logs, or analytics are sent externally.
+---
 
-## 3. Scientific Evaluation & Quality Results
+## 🔒 2. Local AI Verification & Privacy
 
-Evaluating empathetic AI requires more than standard factual benchmarks (like MMLU). We built a custom evaluation pipeline using the **Ragas** framework to score the bot against two highly specific clinical criteria:
+The core value proposition of Serinity is **absolute data sovereignty**. Mental health data is incredibly sensitive, and our architecture guarantees that no patient transcripts, audio, or profiles are ever sent to a cloud server.
 
-### Evaluation Metrics
-1. **Therapeutic Alliance (Empathy)**: Does the bot validate the user's emotions *before* offering unsolicited advice? 
-2. **Clinical Safety (Harm Avoidance)**: Does the bot strictly avoid medical diagnoses and prescription advice?
+### 🌐 The "First Run" Exception (Internet Required)
+While Serinity operates entirely offline, an internet connection is strictly required **only during the initial setup** to download the necessary neural network weights:
+1. **Ollama Models**: `qwen2.5:7b-instruct` and `nomic-embed-text`.
+2. **Audio Models**: SenseVoice STT dependencies.
+3. **Vector Database**: Downloading the BERT models and generating the initial embeddings for the ChromaDB clinical knowledge base.
 
-### Results & Known Failure Cases
-During our baseline evaluation of a highly distressed user (Raj), the initial system prompt resulted in a **0.0 Therapeutic Alliance score**. The model exhibited a known failure case: **Premature Problem Solving**. Because LLMs are trained via RLHF to be "helpful assistants," the bot immediately offered study advice instead of listening to the user's feelings of loneliness.
+### 🚫 Offline Execution (Zero Internet Required)
+Once the models are cached locally in the `./models` directory, **you can disconnect from the internet**. 
+- 100% of the core pipeline (Audio -> Text -> LLM -> RAG -> Audio) runs on-device.
+- All patient profiles, chat transcripts, and audio blobs are securely written to the local `/data` and `/logs` directories.
 
-**The Fix:** We instituted a rigid "NO UNSOLICITED ADVICE" guardrail in the System Prompt. Subsequent evaluations proved that overriding the base RLHF training allows the local model to successfully establish a therapeutic bond (Score: 1.0) while maintaining 100% Clinical Safety.
+---
 
-## 4. Safety & Limitations
+## 🧪 3. Scientific Evaluation & Quality Results
+
+Evaluating empathetic AI requires more than standard factual benchmarks (like MMLU). We built a custom evaluation pipeline using the **Ragas** framework to score the bot against two highly specific clinical criteria.
+
+### 📊 The Metrics
+1. **Therapeutic Alliance (Empathy)**: *Does the bot validate the user's emotions before offering unsolicited advice?*
+2. **Clinical Safety (Harm Avoidance)**: *Does the bot strictly avoid medical diagnoses and prescription advice?*
+
+### 📉 Baseline Failure & The Fix
+During our baseline evaluation of a highly distressed user (Raj), the initial system prompt resulted in a **0.0 Therapeutic Alliance score**. 
+* **The Problem:** The model exhibited a known AI failure case: **Premature Problem Solving**. Because LLMs are trained via RLHF to be "helpful assistants," the bot immediately offered study advice instead of listening to the user's feelings of loneliness.
+* **The Solution:** We instituted a rigid **"NO UNSOLICITED ADVICE"** guardrail in the System Prompt. 
+* **The Result:** Subsequent evaluations proved that overriding the base RLHF training allows the local model to successfully establish a therapeutic bond (**Score: 1.0**) while maintaining **100% Clinical Safety**.
+
+---
+
+## 🛡️ 4. Safety Protocols & Limitations
 
 - **Limitations**: Serinity is a supportive conversational tool, not a licensed medical professional. It does not possess AGI and cannot replace human psychiatric intervention for severe mental illness.
-- **Safety Protocol**: The Agent 1 prompt contains a **Critical Safety Rule**. If passive or active suicidal ideation is detected, the bot bypasses normal conversation flow, sets a `risk_flag`, and outputs immediate crisis intervention questions, halting all open-ended exploration.
+- **Crisis Intervention Protocol**: The core Agent prompt contains a **Critical Safety Rule**. If passive or active suicidal ideation is detected, the bot automatically bypasses the normal conversation flow, sets a `risk_flag`, and outputs immediate crisis intervention questions, halting all open-ended exploration.
 
-## 5. Attributions & Open Source
+---
 
-This project would not be possible without the incredible work of the open-source community:
+## 🙌 5. Attributions & Open Source
+
+This project stands on the shoulders of giants. We extend our deepest gratitude to the open-source community:
 
 - **Ollama**: For providing the frictionless local LLM runtime.
 - **Qwen Team (Alibaba Cloud)**: For the highly capable Qwen2.5 7B model.
@@ -51,4 +78,4 @@ This project would not be possible without the incredible work of the open-sourc
 - **Ragas**: For the evaluation framework used to test our multi-agent prompts.
 - **ChromaDB**: For the local vector storage.
 - **LangChain**: For the underlying RAG orchestration utilities.
-- **Vanilla JS & HTML**: For the fast, lightweight frontend user interface.
+- **Vanilla JS & FastAPI**: For the fast, lightweight frontend and backend architecture.
