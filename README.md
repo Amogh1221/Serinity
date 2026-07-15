@@ -2,13 +2,9 @@
 
 **Serinity** is an offline-first, highly empathetic Conversational AI system designed to conduct rigorous clinical interviews, track mental health trajectories over time, and provide emotional support—all while ensuring 100% data privacy by running entirely on-device.
 
-## Screenshots
-![Conversation](icons/conversation.png)
-![Patient Profile](icons/profile.png)
-![Terminal](icons/terminal.png)
 
-###  [Demo Video Placeholder]
-*(Insert YouTube/Loom Link Here - 2-3 minutes showing the problem, solution, and on-device AI working)*
+### Demo Video
+[Watch the Demo Video](https://drive.google.com/file/d/1leVlpynxIDxYQBItYIxcctSZ6l0ykxlh/view?usp=sharing)
 
 ##  The Problem
 Mental health resources are scarce, expensive, and heavily stigmatized. While cloud-based LLM chatbots offer a potential solution, they introduce severe privacy risks. Users are rightfully terrified of sharing their deepest traumas, suicidal ideations, or relationship struggles with a cloud server that might train on their data or suffer a breach. 
@@ -115,6 +111,12 @@ The background Profile Manager agent silently updates the user's local JSON prof
 ```
 
 ---
+
+## Screenshots
+![Conversation](icons/conversation.png)
+![Patient Profile](icons/profile.png)
+![Terminal](icons/terminal.png)
+
 
 ##  Documentation
 For a deeper dive into the system design, please see the following documents:
