@@ -1,110 +1,111 @@
-# Serinity - Mental Healthcare Assistant
+# Serinity: Local-First AI Psychiatrist
 
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![ChromaDB](https://img.shields.io/badge/ChromaDB-Local%20Vector%20DB-orange.svg)](https://www.trychroma.com/)
-[![Ollama](https://img.shields.io/badge/Ollama-Local%20Inference-black.svg)](https://ollama.com/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/Amogh1221/Serinity/blob/main/LICENSE)
+**Serinity** is an offline-first, highly empathetic Conversational AI system designed to conduct rigorous clinical interviews, track mental health trajectories over time, and provide emotional support—all while ensuring 100% data privacy by running entirely on-device.
 
-> **OSDHack 2026 Submission:** This project has been explicitly engineered for the **On Device AI** theme.
+### 🎥 [Demo Video Placeholder]
+*(Insert YouTube/Loom Link Here - 2-3 minutes showing the problem, solution, and on-device AI working)*
 
----
+## 🌟 The Problem
+Mental health resources are scarce, expensive, and heavily stigmatized. While cloud-based LLM chatbots offer a potential solution, they introduce severe privacy risks. Users are rightfully terrified of sharing their deepest traumas, suicidal ideations, or relationship struggles with a cloud server that might train on their data or suffer a breach. 
 
-##  What We Built
-**Serinity** is an intelligent, production-ready psychiatric assessment system powered by Large Language Models (LLMs) and Retrieval Augmented Generation (RAG). It features a conversational AI that conducts empathetic clinical interviews via a natural voice interface. Behind the scenes, the system analyzes conversation patterns in real-time and provides evidence-based psychological insights grounded in clinical psychopathology literature.
+Furthermore, general-purpose AIs suffer from "Helpful Assistant Syndrome"—they offer premature advice and toxic positivity rather than acting as professional, empathetic listeners.
 
-##  Why It Matters
-Mental healthcare is heavily stigmatized, expensive, and largely inaccessible for millions. While AI has the potential to bridge this gap, putting highly sensitive mental health and conversational data into the cloud raises massive privacy concerns. 
-
-**Serinity matters because it provides enterprise-grade, intelligent psychiatric assessment completely offline.** By running locally on the user's device, we guarantee absolute data privacy. Users can speak freely about their mental state without fear of their data being harvested, leaked, or used for model training by third-party cloud providers. Furthermore, an offline-first approach eliminates cloud API latency, providing a seamless, real-time voice experience.
-
-##  How It Works
-Serinity utilizes an "Intent-Driven Synchronous 3-Pipeline" architecture combining specialized LLM behaviors and local semantic search:
-
-1. **Tri-Pipeline LLM Architecture (via Ollama)**: 
-   - **LLM1 (Conversational/Query)**: `phi4-mini` handles real-time dialogue, acting as an empathetic interviewer. If the user asks for advice, it triggers a synchronous RAG pipeline to provide immediate, evidence-based answers.
-   - **LLM2 (Analyst)**: `qwen2.5:7b-instruct` runs synchronous, heavy pattern-recognition across multiple psychological domains during the session.
-   - **LLM3 (Profile Manager)**: `qwen2.5:7b-instruct` runs at the end of the session to generate concise clinical summaries and intelligently merge/deduplicate long-term patient profiles.
-2. **Local RAG Pipeline**: Uses a local **ChromaDB** instance to perform semantic searches over 122k+ psychiatric Q&A pairs (using `nomic-embed-text` embeddings with HyDE optimization), providing clinical context to the LLMs.
-3. **Voice Processing**: Uses **SenseVoice-Small** via FunASR for Speech-to-Text and emotional tone detection, while utilizing the Browser-native Web Speech API for zero-latency Text-to-Speech.
-4. **Session Management**: Persistent SQLite-backed patient memory tracks previous session summaries and continuously evaluates safety risk flags.
-
-##  How It Uses On Device AI
-This project strictly adheres to the **On Device AI** theme. **The entire AI stack runs 100% locally on the device.** No cloud AI APIs are used.
-* **Local Inference:** LLMs are hosted entirely on the local machine using Ollama.
-* **Local Vector DB:** ChromaDB stores and retrieves all clinical embeddings locally.
-* **Local Speech AI:** SenseVoice processes audio on-device without sending voice bytes to external servers.
+## 💡 The Solution
+Serinity solves this by operating as a **Local-First, Multi-Agent System**:
+- **100% Private**: Audio processing, Vector Database (RAG), and LLM inference happen entirely on your local hardware. No user data ever leaves the machine.
+- **Clinically Grounded**: Powered by a Retrieval-Augmented Generation (RAG) pipeline loaded with psychiatric literature (like *Sims' Symptoms in the Mind*), allowing the bot to conduct structured clinical interviews.
+- **Agentic Memory**: Uses a background agent to continually update a structured "Clinical Profile" across 8 domains (Emotional Themes, Behavioral Patterns, Risk Assessment) to track patient trajectories over multiple sessions.
 
 ---
 
-##  Demo Video & Screenshots
-> **Note to evaluator:** 
-* [Link to Demo Video](#) *(Insert YouTube/Vimeo link here)*
-
-### Screenshots
-
-#### 1. Conversational Interface (phi4-mini)
-![Chat UI](icons/conversation.png)
-
-#### 2. Clinical History & Patient Profile (qwen2.5:7b-instruct)
-![Patient Profile](icons/profile.png)
-
-#### 3. Local Inference Logs (100% On-Device)
-![Terminal Logs](icons/terminal.png)
-
----
-
-##  How Others Can Run or Try It (Setup Instructions)
+## 🚀 Setup Instructions
 
 ### Prerequisites
-- **Python 3.11+**
-- **Ollama** installed on your machine.
-- **FFmpeg** (for audio processing).
+1. **Python 3.10+**
+2. **Ollama**: Must be installed locally and running.
+   ```bash
+   # Pull the required embeddings and chat model
+   ollama pull nomic-embed-text:latest
+   ollama pull qwen2.5:7b-instruct
+   ```
+3. **FFmpeg**: Required for audio processing. Make sure it's added to your system PATH.
 
-### 1. Ollama Setup
-Before running the application, ensure Ollama is running and pull the necessary models:
-```bash
-ollama run phi4-mini
-ollama run qwen2.5:7b-instruct
-ollama run nomic-embed-text
-```
+### Installation
 
-### 2. Installation
-Clone the repository and set up the environment:
-```bash
-git clone https://github.com/Amogh1221/Serinity.git
-cd Serinity
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/serinity.git
+   cd serinity
+   ```
 
-# Create and activate a virtual environment
-python -m venv .venv
+2. **Backend Setup (FastAPI):**
+   ```bash
+   # Create a virtual environment
+   python -m venv .venv
+   
+   # Activate it (Windows)
+   .venv\Scripts\activate
+   
+   # Install dependencies
+   pip install -r requirements.txt
+   ```
 
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
+3. **Frontend Setup (Next.js):**
+   ```bash
+   cd ui
+   npm install
+   ```
 
-# Install dependencies
-pip install -r Requirements.txt
-```
-
-### 3. Environment Configuration
-Create a `.env` file in the root directory:
-Copy the contents of .env.example file on it
-
-### 4. Initialize Database & Run
-```bash
-# Populate the ChromaDB vector database (Run this once)
-python scripts/build_vector_db.py
-
-# Start the FastAPI server
-uvicorn main:app --host 0.0.0.0 --port 7860
-```
-Open your browser and navigate to `http://localhost:7860` to access the application.
+4. **Environment Variables:**
+   Create a `.env` file in the root directory. You do *not* need an API key for the core local features, but ensure the following are set if testing the optional cloud fallbacks:
+   ```env
+   # Keep empty for 100% local usage
+   GOOGLE_API_KEY="" 
+   ```
 
 ---
 
-##  License
-This project is licensed under the [MIT License](LICENSE).
+## 💻 Run Commands
 
-## Disclaimer
-This application is for educational and hackathon demonstration purposes only. It is not intended to be a substitute for professional medical advice, diagnosis, or treatment.
+To start the application, you need to run both the backend and frontend servers simultaneously.
+
+**Terminal 1 (Backend):**
+```bash
+.venv\Scripts\activate
+uvicorn main:app --reload
+```
+*The backend will be available at `http://localhost:8000`*
+
+**Terminal 2 (Frontend):**
+```bash
+cd ui
+npm run dev
+```
+*The UI will be available at `http://localhost:3000`*
+
+---
+
+## 🗣️ Sample Inputs and Expected Outputs
+
+**User:** "I've been feeling really isolated lately. My exams are coming up and I have no friends to talk to."
+
+**Expected Output (Serinity):**
+*The bot correctly suppresses the urge to give unsolicited advice, prioritizing Therapeutic Alliance.*
+> "It sounds really isolating to be studying so intensely without your friends around. Balancing that exam pressure while feeling lonely is incredibly tough. I'm here to listen. When did this feeling of being stuck first start?"
+
+**Behind the Scenes (Clinical Profile Update):**
+The background Profile Manager agent silently updates the user's local JSON profile:
+```json
+{
+  "emotional_themes": ["Intense feelings of isolation and loneliness", "Exam-related stress"],
+  "behavioral_patterns": ["Withdrawing due to study pressures"],
+  "risk_assessment": "No safety concerns identified. Patient is seeking emotional support for situational stress."
+}
+```
+
+---
+
+## 📚 Documentation
+For a deeper dive into the system design, please see the following documents:
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System diagrams and data flow.
+- [TECHNICAL_REPORT.md](TECHNICAL_REPORT.md) - Specs, metrics, safety protocols, and attribution.

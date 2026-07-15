@@ -44,6 +44,7 @@ MH_db/
 *.webm
 *.onnx
 *.json.gz
+extra/
 
 # IDEs
 .vscode/
