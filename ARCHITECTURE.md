@@ -7,7 +7,7 @@ Serinity is designed as a modular, local-first multi-agent system. The architect
 ```mermaid
 graph TD
     %% Frontend Components
-    subgraph Frontend ["Next.js Client (UI)"]
+    subgraph Frontend ["Client"]
         A["User Interface"]
         Mic["Microphone Input"]
     end
