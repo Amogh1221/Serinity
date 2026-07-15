@@ -79,7 +79,7 @@ Serinity is **100% Local-First**.
 
 | Component | Technology | Execution Environment |
 | :--- | :--- | :--- |
-| **Frontend UI** | Next.js, React, Tailwind | Local Browser (localhost:3000) |
+| **Frontend UI** | Vanilla HTML, CSS, JavaScript | Local Browser (localhost:8000) |
 | **Backend API** | Python, FastAPI | Local Server (localhost:8000) |
 | **Speech-to-Text** | SenseVoice | Local Device |
 | **LLM Inference** | Ollama (Qwen2.5 7B) | Local Device (CPU/GPU/NPU) |

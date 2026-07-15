@@ -51,4 +51,4 @@ This project would not be possible without the incredible work of the open-sourc
 - **Ragas**: For the evaluation framework used to test our multi-agent prompts.
 - **ChromaDB**: For the local vector storage.
 - **LangChain**: For the underlying RAG orchestration utilities.
-- **Next.js & TailwindCSS**: For the frontend user interface.
+- **Vanilla JS & HTML**: For the fast, lightweight frontend user interface.

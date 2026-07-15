@@ -50,13 +50,7 @@ Serinity solves this by operating as a **Local-First, Multi-Agent System**:
    pip install -r requirements.txt
    ```
 
-3. **Frontend Setup (Next.js):**
-   ```bash
-   cd ui
-   npm install
-   ```
-
-4. **Environment Variables:**
+3. **Environment Variables:**
    Create a `.env` file in the root directory. You do *not* need an API key for the core local features, but ensure the following are set if testing the optional cloud fallbacks:
    ```env
    # Keep empty for 100% local usage
@@ -67,21 +61,14 @@ Serinity solves this by operating as a **Local-First, Multi-Agent System**:
 
 ## 💻 Run Commands
 
-To start the application, you need to run both the backend and frontend servers simultaneously.
+To start the application, you only need to run the backend server, which also serves the frontend templates.
 
-**Terminal 1 (Backend):**
+**Terminal (Backend):**
 ```bash
 .venv\Scripts\activate
 uvicorn main:app --reload
 ```
-*The backend will be available at `http://localhost:8000`*
-
-**Terminal 2 (Frontend):**
-```bash
-cd ui
-npm run dev
-```
-*The UI will be available at `http://localhost:3000`*
+*The full application will be available at `http://localhost:8000`*
 
 ---
 
