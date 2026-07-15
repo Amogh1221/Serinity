@@ -7,31 +7,31 @@ Serinity is designed as a modular, local-first multi-agent system. The architect
 ```mermaid
 graph TD
     %% Frontend Components
-    subgraph Frontend [Next.js Client (UI)]
-        A[User Interface]
-        Mic[Microphone Input]
+    subgraph Frontend ["Next.js Client (UI)"]
+        A["User Interface"]
+        Mic["Microphone Input"]
     end
 
     %% Backend API Layer
-    subgraph Backend [FastAPI Backend]
-        Router[API Routers]
-        AudioProc[SenseVoice STT]
-        CO[Conversation Orchestrator]
-        RAG[ChromaDB Retriever]
+    subgraph Backend ["FastAPI Backend"]
+        Router["API Routers"]
+        AudioProc["SenseVoice STT"]
+        CO["Conversation Orchestrator"]
+        RAG["ChromaDB Retriever"]
     end
 
     %% Multi-Agent LLM Layer
-    subgraph MultiAgent [Ollama Local LLMs]
-        LLM1[Agent 1: Clinical Interviewer]
-        LLM2[Agent 2: Pattern Analyst]
-        LLM3[Agent 3: Profile Manager]
+    subgraph MultiAgent ["Ollama Local LLMs"]
+        LLM1["Agent 1: Clinical Interviewer"]
+        LLM2["Agent 2: Pattern Analyst"]
+        LLM3["Agent 3: Profile Manager"]
     end
 
     %% Storage Layer
-    subgraph Storage [Local File System]
-        PD[Patient Profiles JSON]
-        VD[Chroma Vector Store]
-        History[Chat Transcripts]
+    subgraph Storage ["Local File System"]
+        PD["Patient Profiles JSON"]
+        VD["Chroma Vector Store"]
+        History["Chat Transcripts"]
     end
 
     %% Data Flow
