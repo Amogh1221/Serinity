@@ -42,7 +42,7 @@ def send_otp_email(to_email: str, subject: str, otp_code: str, body_text: Option
     payload = {
         "sender": {
             "name": "Serinity AI",
-            "email": "noreply@serinity.ai"
+            "email": os.getenv("BREVO_SENDER_EMAIL", "ag14gupta@gmail.com")
         },
         "to": [
             {
