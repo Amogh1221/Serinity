@@ -1,4 +1,4 @@
-export const BACKEND_URL = "";
+export const BACKEND_URL = "https://amogh1221-serinity.hf.space";
 
 // Helper to get token
 export function getToken() {
