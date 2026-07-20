@@ -4,14 +4,15 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import asyncio
 from api.routes import router
-from api.dependencies import get_patient_service
+from api.routers.auth import router as auth_router
+from api.dependencies import patient_service
 
 async def session_sweeper_task():
     """Background task to sweep idle sessions every 5 minutes."""
     while True:
         try:
             # Sweep sessions inactive for 30 minutes
-            get_patient_service().sweep_abandoned_sessions(timeout_minutes=30)
+            patient_service.sweep_abandoned_sessions(timeout_minutes=30)
         except Exception as e:
             print(f"[Sweeper Error] {e}")
         # Sleep for 5 minutes
@@ -40,4 +41,5 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+app.include_router(auth_router)
 app.include_router(router)

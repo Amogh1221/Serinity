@@ -41,82 +41,175 @@
     </p>
   </div>
 
-  <!-- Profile Selection Screen -->
-  <div id="profileSelectionScreen" style="display: none;" class="fixed inset-0 bg-paper z-40 flex flex-col items-center justify-center p-4">
-    <div class="panel p-8 max-w-md w-full">
-      <div class="mb-8">
-        <h2 class="text-2xl font-display text-ink mb-2">Patient Records</h2>
-        <p class="text-clay text-sm">Access an existing clinical file or open a new one.</p>
+  <!-- Auth Screen -->
+  <div id="authScreen" style="display: none;" class="fixed inset-0 bg-paper z-40 flex flex-col items-center justify-center p-4 overflow-y-auto custom-scrollbar">
+    <div class="panel p-8 max-w-md w-full my-auto shadow-sm">
+      
+      <!-- Logo/Branding -->
+      <div class="flex items-center gap-3 mb-8 justify-center">
+        <img src="/static/icons/logo.svg" alt="Serinity Logo" class="w-10 h-10">
+        <h2 class="text-3xl font-display text-ink">Serinity</h2>
       </div>
 
-      <!-- Returning Profile Selection -->
-      <div class="space-y-3 mb-8">
-        <label class="block text-xs font-utility text-ink uppercase tracking-wider">Existing Patient</label>
-        <select 
-          id="patientDropdown" 
-          class="w-full bg-transparent border border-ink text-ink rounded-none px-4 py-3 outline-none focus:border-moss transition"
-        >
-          <option value="">-- Select File --</option>
-        </select>
-        <button 
-          id="selectProfileBtn" 
-          class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm"
-          disabled
-        >
-          Open File
+      <!-- Login Form -->
+      <div id="loginFormContainer" class="block space-y-5">
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">Username / Email *</label>
+          <input type="text" id="loginUsername" placeholder="Username or Email" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss transition">
+        </div>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">Password</label>
+          <input type="password" id="loginPassword" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss transition" placeholder="Enter password">
+        </div>
+        <div class="flex justify-between items-center text-xs font-utility uppercase tracking-widest mt-2">
+          <button id="showForgotPwdBtn" class="text-clay hover:text-ink transition">Forgot Password?</button>
+        </div>
+        <button id="loginBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-4">
+          Log In
+        </button>
+        <div class="text-center mt-6 border-t border-ink/20 pt-6">
+          <p class="text-xs text-clay font-utility uppercase tracking-widest mb-3">New Patient?</p>
+          <button id="showSignupBtn" class="w-full bg-transparent border border-ink text-ink hover:bg-ink hover:text-paper transition py-3 font-utility uppercase tracking-widest text-sm">
+            Create Account
+          </button>
+        </div>
+      </div>
+
+      <!-- Signup Form -->
+      <div id="signupFormContainer" class="hidden space-y-4">
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">Full Name *</label>
+          <input type="text" id="signupName" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss" placeholder="Jane Doe">
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs font-utility text-clay uppercase mb-1">Username *</label>
+            <input type="text" id="signupUsername" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss">
+          </div>
+          <div>
+            <label class="block text-xs font-utility text-clay uppercase mb-1">Gender *</label>
+            <select id="signupGender" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss">
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-utility text-clay uppercase mb-1">Age</label>
+            <input type="number" id="signupAge" min="5" max="99" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">Email *</label>
+          <input type="email" id="signupEmail" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss" placeholder="jane@example.com">
+        </div>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">Password *</label>
+          <input type="password" id="signupPassword" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="relative" id="nationalityWrapper">
+            <label class="block text-xs font-utility text-clay uppercase mb-1" title="For cultural context">Nationality *</label>
+            <input type="text" id="signupNationality" autocomplete="off" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss" placeholder="e.g. India">
+            <div id="nationalityDropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-paper border border-ink z-50 max-h-48 overflow-y-auto shadow-lg">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-utility text-clay uppercase mb-1">Primary Concern *</label>
+            <select id="signupConcern" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss">
+              <option value="">Select...</option>
+              <option value="Anxiety">Anxiety</option>
+              <option value="Depression">Depression</option>
+              <option value="Stress">Stress</option>
+              <option value="Sleep">Sleep Issues</option>
+              <option value="General">General Wellness</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-utility text-clay uppercase mb-1">Emergency Contact Name</label>
+            <input type="text" id="signupEmergencyName" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss" placeholder="John Doe">
+          </div>
+          <div>
+            <label class="block text-xs font-utility text-clay uppercase mb-1">Emergency Contact Phone</label>
+            <input type="tel" id="signupEmergencyPhone" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:border-moss" placeholder="+1 234 567 8900">
+          </div>
+        </div>
+
+        <button id="signupGetOtpBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-4">
+          Get OTP
+        </button>
+
+        <button id="backToLoginBtn1" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
+          &larr; Back to Login
         </button>
       </div>
 
-      <div class="flex items-center my-6">
-        <div class="flex-1 border-t border-ink"></div>
-        <span class="mx-4 text-xs text-clay uppercase tracking-widest font-utility">OR</span>
-        <div class="flex-1 border-t border-ink"></div>
+      <!-- Forgot Password Form -->
+      <div id="forgotPwdFormContainer" class="hidden space-y-4">
+        <p class="text-sm text-clay font-body mb-4">Enter your email address and we will send you a 6-digit verification code to reset your password.</p>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">Email Address</label>
+          <input type="email" id="forgotPwdEmail" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss transition" placeholder="jane@example.com">
+        </div>
+        <button id="requestOtpBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
+          Send Code
+        </button>
+        <button id="backToLoginBtn2" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
+          &larr; Back to Login
+        </button>
       </div>
 
-      <!-- Create New Profile -->
-      <div class="space-y-4">
-        <details class="group border border-ink bg-paper p-4 cursor-pointer open:pb-4">
-          <summary class="block text-xs font-utility text-ink uppercase tracking-wider select-none outline-none">
-            <span class="group-open:hidden">+</span><span class="hidden group-open:inline">-</span> Create New Profile
-          </summary>
-          <div class="space-y-3 mt-4 cursor-default" onclick="event.stopPropagation()">
-            <div>
-              <label class="block text-xs font-utility text-clay uppercase mb-1">Full Name</label>
-              <input type="text" id="newPatientName" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="Jane Doe">
-            </div>
-            
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-utility text-clay uppercase mb-1">Age</label>
-                <input type="number" id="newPatientAge" min="5" max="100" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="e.g. 34">
-              </div>
-              <div>
-                <label class="block text-xs font-utility text-clay uppercase mb-1">Gender</label>
-                <select id="newPatientGender" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink">
-                  <option value="">Select</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-utility text-clay uppercase mb-1">Occupation</label>
-              <input type="text" id="newPatientOccupation" class="w-full bg-paper border border-ink p-2 text-ink focus:outline-none focus:ring-1 focus:ring-ink" placeholder="e.g. Software Engineer">
-            </div>
-
-            <button 
-              id="createProfileBtn" 
-              class="w-full bg-transparent border border-ink hover:bg-ink hover:text-paper text-ink transition py-3 font-utility uppercase tracking-widest text-sm mt-4"
-            >
-              CREATE FILE
-            </button>
-          </div>
-        </details>
+      <!-- Reset Password Step 1: OTP Verification -->
+      <div id="otpStepContainer" class="hidden space-y-4">
+        <p class="text-sm text-clay font-body mb-4 text-center">We've sent a 6-digit code to your email.</p>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">6-Digit Code</label>
+          <input type="text" id="resetOtpCode" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss text-center tracking-widest font-mono text-lg" placeholder="000000" maxlength="6" inputmode="numeric">
+        </div>
+        <button id="verifyOtpBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
+          Verify Code
+        </button>
+        <button id="backToForgotBtn" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
+          &larr; Back
+        </button>
       </div>
+
+      <!-- Reset Password Step 2: New Password (no back button) -->
+      <div id="newPwdStepContainer" class="hidden space-y-4">
+        <p class="text-sm text-clay font-body mb-4 text-center">OTP verified. Enter your new password below.</p>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">New Password</label>
+          <input type="password" id="resetNewPassword" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss" placeholder="Min. 8 characters">
+        </div>
+        <button id="submitResetBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
+          Update Password
+        </button>
+      </div>
+
+      <!-- Signup Step 2: OTP Verification -->
+      <div id="signupOtpStepContainer" class="hidden space-y-4">
+        <p class="text-sm text-clay font-body mb-4 text-center">We've sent a 6-digit code to your email.</p>
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">6-Digit Code *</label>
+          <input type="text" id="signupOtpCode" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss text-center tracking-widest font-mono text-lg" placeholder="000000" maxlength="6" inputmode="numeric">
+        </div>
+        <button id="signupCompleteBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
+          Complete Signup
+        </button>
+        <button id="backToSignupBtn" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
+          &larr; Back to Signup
+        </button>
+      </div>
+
     </div>
   </div>
+
+  <!-- Profile Selection Screen Removed -->
 
   <!-- Patient Dashboard -->
   <div class="hidden max-w-5xl mx-auto w-full h-screen p-4 flex-col fade-in overflow-hidden" id="dashboardScreen">
@@ -148,17 +241,16 @@
         </div>
       </div>
 
-      <!-- Footer -->
       <div class="mt-8 pt-6 border-t border-ink/30 shrink-0 flex flex-wrap justify-between items-center gap-4">
-        <button class="text-xs font-utility tracking-widest text-clay hover:text-ink uppercase transition flex items-center gap-2" id="dashboardBackBtn">
-          <span>&larr;</span> CLOSE FILE
+        <button class="text-xs font-utility tracking-widest text-clay hover:text-ink uppercase transition flex items-center gap-2" id="dashboardLogoutBtn">
+          <span>&larr;</span> LOGOUT
         </button>
         <div class="flex gap-4">
           <button class="text-xs font-utility tracking-widest text-signal border border-signal hover:bg-signal hover:text-paper uppercase transition px-4 py-2 flex items-center gap-2" id="dashboardResetBtn">
-            RESET PROFILE
+            RESET DATA
           </button>
           <button class="text-xs font-utility tracking-widest text-paper bg-signal hover:bg-signal/90 uppercase transition px-4 py-2 flex items-center gap-2" id="dashboardDeleteBtn">
-            DELETE PROFILE
+            DELETE ACCOUNT
           </button>
         </div>
       </div>
@@ -311,6 +403,54 @@
     </div>
   </div>
 
-  <script type="module" src="/static/js/app.js?v=28.0"></script>
+  <!-- Alert Modal -->
+  <div id="alertModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-[70] flex flex-col items-center justify-center p-4 fade-in">
+    <div class="bg-paper border border-ink p-8 max-w-sm w-full shadow-lg">
+      <h2 class="text-xl font-display text-ink mb-2" id="alertModalTitle">Notice</h2>
+      <p class="text-clay text-sm mb-6" id="alertModalText"></p>
+      <button id="alertModalOkBtn" class="w-full bg-ink text-paper hover:bg-moss transition py-2 font-utility uppercase tracking-widest text-sm">
+        OK
+      </button>
+    </div>
+  </div>
+
+  <!-- Delete Account Confirmation Modal -->
+  <div id="deleteAccountConfirmModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
+    <div class="panel p-8 max-w-sm w-full shadow-lg">
+      <h2 class="text-xl font-display text-signal mb-2">Delete Account?</h2>
+      <p class="text-clay text-sm mb-6">Are you sure you want to completely delete your account? This action is irreversible and all data will be erased. An OTP will be sent to your email to verify.</p>
+      
+      <div class="flex gap-4">
+        <button id="deleteAccountCancelBtn" class="flex-1 bg-transparent border border-ink text-ink hover:bg-ink hover:text-paper transition py-2 font-utility uppercase tracking-widest text-sm">
+          CANCEL
+        </button>
+        <button id="deleteAccountSendOtpBtn" class="flex-1 bg-signal text-paper hover:bg-signal/80 transition py-2 font-utility uppercase tracking-widest text-sm">
+          SEND OTP
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Account OTP Modal -->
+  <div id="deleteAccountOtpModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
+    <div class="panel p-8 max-w-sm w-full shadow-lg">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-display text-signal">Delete Account</h2>
+        <button id="closeDeleteOtpModalBtn" class="text-clay hover:text-ink transition">&times;</button>
+      </div>
+      <p class="text-clay text-sm mb-6">An OTP has been sent to your email. Enter it below to permanently delete your account and all data.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">6-Digit Code</label>
+          <input type="text" id="deleteAccountOtpCode" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss text-center tracking-widest font-mono text-lg" placeholder="000000" maxlength="6">
+        </div>
+        <button id="submitDeleteOtpBtn" class="w-full bg-signal text-paper hover:bg-signal/90 transition py-3 font-utility uppercase tracking-widest text-sm mt-2">
+          Verify & Delete
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>

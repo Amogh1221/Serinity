@@ -14,10 +14,28 @@ class BertRiskSignal:
     with much higher contextual accuracy than regex keywords.
     """
     def __init__(self, model_name: str = "Akashpaul123/bert-suicide-detection"):
-        logger.info(f"Loading BertRiskSignal with model: {model_name}. This may take a moment on first run to download...")
-        # The pipeline handles downloading and caching automatically using HF_HOME
-        self.classifier = pipeline("text-classification", model=model_name, truncation=True, max_length=512)
-        logger.info("BertRiskSignal loaded successfully.")
+        logger.info(f"Loading BertRiskSignal with model: {model_name}.")
+        # Use local_files_only=True to skip HuggingFace's network version-check on startup.
+        # This prevents 504 timeouts when the hub is unreachable or slow.
+        # On first run (no cache), this will fail and fall back to downloading automatically.
+        try:
+            self.classifier = pipeline(
+                "text-classification",
+                model=model_name,
+                truncation=True,
+                max_length=512,
+                local_files_only=True,
+            )
+            logger.info("BertRiskSignal loaded from local cache.")
+        except Exception:
+            logger.info("Local cache not found. Downloading BERT model from HuggingFace (first-time setup)...")
+            self.classifier = pipeline(
+                "text-classification",
+                model=model_name,
+                truncation=True,
+                max_length=512,
+            )
+            logger.info("BertRiskSignal downloaded and loaded successfully.")
 
     def check(self, message: str, llm1_output: LLM1Output, llm2_output: Optional[LLM2Output] = None) -> bool:
         if not message or not message.strip():

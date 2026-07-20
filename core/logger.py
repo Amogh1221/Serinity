@@ -1,133 +1,130 @@
 # -*- coding: utf-8 -*-
 """
-debug_logger.py — Structured debug logging for Serinity.
+logger.py — Structured logging for Serinity (BetterStack + Local Rotation).
 
-Writes one file per session into logs/:
-  1. <user_name>(hh-mm-ss_dd-mm-yyyy).jsonl  — machine-parseable, one JSON object per event
-
-Events logged:
-  - session_start        : new session opened
-  - user_message         : raw user text (before vocal tone prefix)
-  - safety_check         : result of contains_risk_signal()
-  - llm1_decision        : LLM1's full output (message + intent + clinical_summary)
-  - analyze_triggered    : retrieval query sent to ChromaDB
-  - retrieved_context    : full retrieved context from ChromaDB
-  - llm2_output          : full LLM2 analysis across all 8 domains
-  - llm1_final           : LLM1's synthesis response after ANALYZE
-  - assistant_reply      : final message sent to user (after safety injection)
-  - error                : any caught exception
-
-Usage:
-    from core.logger import get_logger, close_logger
-    log = get_logger(session_id)
-    log.user_message("I feel hopeless")
-    log.llm1_decision(llm1_response)
-    ...
-    close_logger(session_id)
+Writes logs to a single rolling file (logs/serinity.log) max 10MB each.
+Streams logs to BetterStack if BETTERSTACK_SOURCE_TOKEN is set.
 """
 
 import os
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 
+try:
+    from logtail import LogtailHandler
+except ImportError:
+    LogtailHandler = None
+
 load_dotenv()
 
 LOG_DIR = os.getenv("LOG_DIR", "./logs")
+os.makedirs(LOG_DIR, exist_ok=True)
 
+# Set up global logger
+serinity_logger = logging.getLogger("serinity")
+serinity_logger.setLevel(logging.INFO)
+serinity_logger.propagate = False # Prevent double logging if root logger is active
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+# 1. Local Rotating File Handler (Max 10MB, Keep 5)
+file_path = os.path.join(LOG_DIR, "serinity.log")
+file_handler = RotatingFileHandler(file_path, maxBytes=10*1024*1024, backupCount=5, encoding="utf-8")
+file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+serinity_logger.addHandler(file_handler)
 
+# 2. BetterStack Handler
+CLOUD_MODE = os.getenv("CLOUD_MODE", "false").lower() == "true"
+source_token = os.getenv("BETTERSTACK_SOURCE_TOKEN")
+
+if CLOUD_MODE and source_token and LogtailHandler:
+    logtail_handler = LogtailHandler(source_token=source_token)
+    serinity_logger.addHandler(logtail_handler)
 
 class DebugLogger:
     """
-    Per-session logger. Create one instance per session and call close() when done.
+    Per-session logger instance wrapper.
+    Formats structured events and pushes them to the global logger.
     """
 
     def __init__(self, session_id: str, user_name: str = "Unknown", session_number: int = 1):
         self.session_id = session_id
+        self.user_name = user_name
+        self._turn = 0
 
-        # Format date-time as SS-MM-HH_DD-MM-YY
-        ts_slug = datetime.now().strftime("%S-%M-%H_%d-%m-%y")
-        safe_user_name = "".join(c for c in user_name if c.isalnum() or c in (' ', '_', '-')).strip().replace(" ", "_")
-        
-        user_log_dir = os.path.join(LOG_DIR, safe_user_name)
-        os.makedirs(user_log_dir, exist_ok=True)
-        
-        self._jsonl_path = os.path.join(user_log_dir, f"S{session_number}_{ts_slug}.jsonl")
-
-        self._jsonl = open(self._jsonl_path, "a", encoding="utf-8")
-        self._turn  = 0
-
-        self._write_jsonl("session_start", {"session_id": session_id})
+    def _log_event(self, event_type: str, data: dict):
+        payload = {
+            "session_id": self.session_id,
+            "user_name": self.user_name,
+            "event_type": event_type,
+            **data
+        }
+        # Dump to JSON for local file, and pass 'extra' for BetterStack structuring
+        log_message = json.dumps(payload, ensure_ascii=False)
+        serinity_logger.info(log_message, extra=payload)
 
     # Public logging methods
 
     def session_start(self, patient_id: str | None):
-        self._write_jsonl("session_start", {"patient_id": patient_id})
+        # We defer logging empty sessions until the first user message.
+        pass
 
     def user_message(self, raw_text: str, emotion: str | None = None):
+        if self._turn == 0:
+            # Lazy-log the session start now that we know they actually sent a message
+            self._log_event("session_start", {"patient_id": "active"})
+        
         self._turn += 1
-        self._write_jsonl("user_message", {
+        self._log_event("user_message", {
             "turn":    self._turn,
             "text":    raw_text,
             "emotion": emotion,
         })
 
     def safety_check(self, text: str, risk_flagged: bool):
-        self._write_jsonl("safety_check", {
+        self._log_event("safety_check", {
             "turn":        self._turn,
             "risk_flagged": risk_flagged,
             "text_snippet": text[:100],
         })
 
     def llm1_decision(self, llm1_output):
-        """Log LLM1's response — always called, regardless of intent."""
-        self._write_jsonl("llm1_decision", {
+        self._log_event("llm1_decision", {
             "turn":             self._turn,
-            "intent":           llm1_output.intent,
-            "message":          llm1_output.assistant_message,
-            "clinical_summary": llm1_output.clinical_summary,
+            "intent":           llm1_output.intent if hasattr(llm1_output, 'intent') else "unknown",
+            "llm_message":      llm1_output.assistant_message if hasattr(llm1_output, 'assistant_message') else "",
         })
 
     def analyze_triggered(self, retrieval_query: str, query_source: str):
-        """Log that ANALYZE path started and what query was sent to ChromaDB."""
-        self._write_jsonl("analyze_triggered", {
+        self._log_event("analyze_triggered", {
             "turn":            self._turn,
             "query_source":    query_source,
             "retrieval_query": retrieval_query,
         })
 
-    def retrieved_context(self, context_text: str):
-        """Log the full retrieved ChromaDB context."""
-        docs = context_text.split("\n\n") if context_text else []
-        self._write_jsonl("retrieved_context", {
-            "turn":             self._turn,
-            "num_docs":         len(docs),
-            "context":          context_text,
+    def retrieved_context(self, context_str: str):
+        self._log_event("retrieved_context", {
+            "turn":           self._turn,
+            "context_length": len(context_str),
         })
 
-    def llm2_output(self, llm2_response):
-        """Log the full LLM2 analysis output."""
-        self._write_jsonl("llm2_output", {
-            "turn":                  self._turn,
-            "assistant_message":     getattr(llm2_response, "assistant_message", ""),
-            "emotional_themes":      llm2_response.emotional_themes,
-            "thinking_patterns":     llm2_response.thinking_patterns,
-            "behavioral_patterns":   llm2_response.behavioral_patterns,
-            "interpersonal_dynamics":llm2_response.interpersonal_dynamics,
-            "stressors":             llm2_response.stressors,
-            "unclear_areas":         llm2_response.unclear_areas,
-            "protective_factors":    llm2_response.protective_factors,
-            "risk_assessment":       llm2_response.risk_assessment,
+    def llm2_output(self, llm2_analysis):
+        self._log_event("llm2_output", {
+            "turn":           self._turn,
+            "analysis_dump":  str(llm2_analysis),
         })
 
+    def llm1_final(self, final_text: str):
+        self._log_event("llm1_final", {
+            "turn": self._turn,
+        })
 
     def llm3_output(self, llm3_response):
         """Log the full post-session LLM3 analysis."""
-        self._write_jsonl("llm3_output", {
+        self._log_event("llm3_output", {
             "session_summary":       getattr(llm3_response, "session_summary", ""),
             "emotional_themes":      getattr(llm3_response, "emotional_themes", []),
             "thinking_patterns":     getattr(llm3_response, "thinking_patterns", []),
@@ -136,48 +133,34 @@ class DebugLogger:
             "stressors":             getattr(llm3_response, "stressors", []),
         })
 
-    def assistant_reply(self, message: str, risk_injected: bool, latency_ms: int = 0):
-        """Log the final message sent back to the user."""
-        self._write_jsonl("assistant_reply", {
-            "turn":           self._turn,
-            "message":        message,
-            "risk_injected":  risk_injected,
-            "latency_ms":     latency_ms,
+    def assistant_reply(self, message: str, risk_injected: bool = False, latency_ms: int = 0):
+        self._log_event("assistant_reply", {
+            "turn":        self._turn,
+            "message_length": len(message),
+            "risk_injected": risk_injected,
+            "latency_ms": latency_ms,
         })
 
     def error(self, context: str, exc: Exception):
-        self._write_jsonl("error", {
-            "turn":      self._turn,
-            "context":   context,
-            "exception": f"{type(exc).__name__}: {exc}",
+        self._log_event("error", {
+            "turn":    self._turn,
+            "context": context,
+            "error":   str(exc),
         })
 
     def close(self):
-        if hasattr(self, "_jsonl") and not self._jsonl.closed:
-            self._write_jsonl("session_end", {"session_id": self.session_id})
-            self._jsonl.close()
+        # We no longer need to manually close file handlers since logging manages it
+        pass
 
-    # Internal helpers
-
-    def _write_jsonl(self, event: str, data: dict):
-        record = {"ts": _now(), "event": event, **data}
-        self._jsonl.write(json.dumps(record, ensure_ascii=False) + "\n")
-        self._jsonl.flush()
-
-# Convenience: session-keyed registry so main.py can look up loggers by session
-
+# Global dictionary to hold active loggers
 _active_loggers: dict[str, DebugLogger] = {}
 
-
 def get_logger(session_id: str, user_name: str = "Unknown", session_number: int = 1) -> DebugLogger:
-    """Get or create a DebugLogger for the given session."""
     if session_id not in _active_loggers:
         _active_loggers[session_id] = DebugLogger(session_id, user_name, session_number)
     return _active_loggers[session_id]
 
-
 def close_logger(session_id: str):
-    """Close and remove the logger for a session."""
     if session_id in _active_loggers:
         _active_loggers[session_id].close()
         del _active_loggers[session_id]

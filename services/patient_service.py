@@ -1,6 +1,11 @@
+"""
+Patient Service
+Manages high-level lifecycle of patient sessions including creation, summarization, and abandoned session sweeping.
+"""
+
 from typing import Optional, Tuple
 from core.ports import ProfileStore, SessionStore, LLMProvider
-from core.logger import get_logger, close_logger
+from core.logger import get_logger, close_logger, serinity_logger
 
 class PatientService:
     """
@@ -69,10 +74,12 @@ class PatientService:
         has_user_messages = any(msg.get("role") == "user" for msg in history)
         
         summary = "No conversation occurred."
+        llm3_output = None
         if has_user_messages and patient_id:
             try:
+                patient_info = self.profile_store.get_patient(patient_id)
                 old_profile = self.profile_store.get_patient_profile(patient_id)
-                llm3_output = self.llm_provider.generate_end_of_session_profile(old_profile, history)
+                llm3_output = self.llm_provider.generate_end_of_session_profile(old_profile, history, patient_info)
                 
                 if not llm3_output.update_profile:
                     summary = "Not enough conversation to generate a meaningful summary."
@@ -80,6 +87,10 @@ class PatientService:
                     summary = llm3_output.session_summary
                     self.profile_store.update_patient_profile(patient_id, llm3_output)
                     self.profile_store.update_long_term_memory(patient_id, llm3_output)
+                    
+                    if llm3_output.updated_primary_concern:
+                        self.profile_store.update_primary_concern(patient_id, llm3_output.updated_primary_concern)
+                        
             except Exception as e:
                 summary = f"Summary generation failed: {e}"
 
@@ -90,10 +101,10 @@ class PatientService:
         
         session_number = self.session_store.get_session_count(patient_id) if patient_id else 1
         log = get_logger(session_id, user_name, session_number)
-        if 'llm3_output' in locals():
+        if llm3_output:
             log.llm3_output(llm3_output)
         else:
-            log._write_jsonl("session_summary", {"summary": summary})
+            log._log_event("session_summary", {"summary": summary})
         close_logger(session_id)
 
     def sweep_abandoned_sessions(self, timeout_minutes: int = 30) -> None:
@@ -103,14 +114,8 @@ class PatientService:
         abandoned_ids = self.session_store.get_abandoned_sessions(timeout_minutes)
         for session_id in abandoned_ids:
             try:
-                print(f"[PatientService] Sweeping abandoned session {session_id}...")
+                serinity_logger.info(f"Sweeping abandoned session {session_id}...")
                 self.generate_session_summary(session_id)
                 self.end_session(session_id)
             except Exception as e:
-                print(f"[PatientService] Failed to sweep session {session_id}: {e}")
-
-    def get_active_session(self, patient_id: str) -> Optional[str]:
-        return self.session_store.get_active_session(patient_id)
-
-    def get_session_messages(self, session_id: str) -> list[dict]:
-        return self.session_store.get_all_messages(session_id)
+                serinity_logger.error(f"Failed to sweep session {session_id}: {e}")

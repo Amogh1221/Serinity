@@ -68,14 +68,35 @@ Serinity solves this by operating as a **Local-First, Multi-Agent System**:
    CHROMA_COLLECTION_NAME=mhcva-knowledge
    
    # SQLite memory store
-   MEMORY_DB_PATH=./data/seren.db
+   MEMORY_DB_PATH=./data/serinity.db
    
    # Debug logs directory
    LOG_DIR=./logs
    
    # Working memory window (number of raw turns to keep in active context)
    WORKING_MEMORY_TURNS=20
+
+   # Cloud Fallback Configs (if CLOUD_MODE=true)
+   CLOUD_MODE=false
+   GROQ_API_KEY=your_groq_key
+   PINECONE_API_KEY=your_pinecone_key
+   PINECONE_ENVIRONMENT=your_pinecone_env
+   TURSO_DATABASE_URL=your_turso_url
+   TURSO_AUTH_TOKEN=your_turso_token
+   BREVO_API_KEY=your_brevo_key
+   BETTERSTACK_SOURCE_TOKEN=your_betterstack_token
    ```
+
+---
+
+##  Testing & Development
+Serinity includes a comprehensive test suite for both local logic and cloud integrations, using `pytest`.
+
+To run the full test suite (unit + integration tests):
+```bash
+uv run python -m pytest -v tests/
+```
+Ensure you have configured your cloud API keys in `.env` if you wish to run the cloud integration tests (`test_cloud_providers.py`).
 
 ---
 

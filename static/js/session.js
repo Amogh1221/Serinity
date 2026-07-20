@@ -3,6 +3,7 @@ import * as api from './api.js';
 import * as ui from './ui.js';
 import * as audio from './audio.js';
 import * as profiles from './profiles.js';
+import * as auth from './auth.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -35,11 +36,33 @@ export async function handleAssistantResponses(message) {
 }
 
 /**
+ * Ends the current active session, clears intervals, and returns the user to the dashboard.
+ */
+export async function endSession() {
+  if (state.sessionInterval) {
+    clearInterval(state.sessionInterval);
+    state.sessionInterval = null;
+  }
+  state.setSessionId(null);
+  state.setPatientId(null);
+  ui.switchScreen("dashboard");
+}
+
+/**
  * Sends a text message to the backend and handles the response.
  * 
  * @param {string} message - The text message to send.
  * @param {string|null} emotion - Optional emotion tag.
  */
+/**
+ * Submits a new text message to the active session and waits for the AI response.
+ * @param {string} text - The user's input message.
+ * @returns {Promise<boolean>} True if successful, false otherwise.
+ */
+export async function recordMessage(text) {
+  return await sendTextMessage(text);
+}
+
 export async function sendTextMessage(message, emotion = null) {
   ui.addMessage(message, "user");
   ui.addTyping(false, "Analyzing...");
@@ -67,7 +90,11 @@ export async function sendTextMessage(message, emotion = null) {
     }
   } catch (err) {
     ui.removeTyping();
-    ui.addMessage("I apologize, but I'm having trouble connecting right now.", "assistant");
+    if (err.message && (err.message.includes("Tokens Exhausted") || err.message.includes("429"))) {
+      ui.showAlert("Tokens Exhausted", "Your LLM provider tokens have been exhausted. Please wait or upgrade your plan.");
+    } else {
+      ui.addMessage("I apologize, but I'm having trouble connecting right now.", "assistant");
+    }
     console.error("Error:", err);
   }
 }
@@ -77,6 +104,10 @@ export async function sendTextMessage(message, emotion = null) {
  * Transitions UI to main app and starts session timers.
  * 
  * @param {string} pId - The patient ID to start the session for.
+ */
+/**
+ * Starts a new chat session with the AI for the currently selected patient.
+ * Emits an initial context message to the backend.
  */
 export async function startActualSession(pId) {
   try {
@@ -147,20 +178,30 @@ export async function continueActualSession(sessionId) {
  */
 export async function initializeSession(retryCount = 0) {
   const startButton = document.getElementById("startButton");
+  const wakeupText = document.getElementById("wakeupText");
+  
+  if (retryCount === 0) {
+    if (wakeupText) wakeupText.textContent = "Waking up services...";
+    if (startButton) {
+      startButton.disabled = false;
+      startButton.textContent = "Start Consultation";
+    }
+  }
   try {
     await api.pingHealth();
     document.getElementById("loadingDots").style.display = "none";
-    const wakeupText = document.getElementById("wakeupText");
     if (wakeupText) wakeupText.style.display = "none";
 
-    startButton.disabled = false;
-    startButton.textContent = "Start Consultation";
+    if (startButton) {
+      startButton.disabled = false;
+      startButton.textContent = "Start Consultation";
+    }
 
+    // Handle hash routing from OAuth or direct links
     if (window.location.hash) {
       const hash = window.location.hash.substring(1);
       let newPath = "/";
-      if (hash === "profileSelectionScreen") newPath = "/profiles";
-      else if (hash === "dashboardScreen") newPath = "/dashboard";
+      if (hash === "dashboardScreen") newPath = "/dashboard";
       else if (hash === "mainApp") newPath = "/session";
       
       if (newPath !== "/") {
@@ -170,18 +211,17 @@ export async function initializeSession(retryCount = 0) {
 
     // Handle deep linking / routing on load
     const path = window.location.pathname;
-    if (path === "/profiles") {
-      profiles.fetchPatients();
-      ui.switchScreen("profileSelectionScreen", false);
-    } else if (path === "/dashboard" || path === "/session") {
-      if (!state.patientId) {
-        profiles.fetchPatients();
-        ui.switchScreen("profileSelectionScreen");
-      } else if (path === "/session" && !state.sessionId) {
+    if (path === "/dashboard") {
+      // Always re-fetch on refresh — state.patientId is in-memory and lost on reload
+      await profiles.fetchPatients();
+    } else if (path === "/session") {
+      if (!state.sessionId) {
         window.location.href = "/";
       } else {
-        ui.switchScreen(path === "/dashboard" ? "dashboardScreen" : "mainApp", false);
+        ui.switchScreen("mainApp", false);
       }
+    } else {
+      // Allow user to click the start button
     }
   } catch (error) {
     console.error(`Backend not ready (attempt ${retryCount + 1}):`, error);
@@ -190,8 +230,10 @@ export async function initializeSession(retryCount = 0) {
       setTimeout(() => initializeSession(retryCount + 1), delay);
     } else {
       document.getElementById("loadingDots").style.display = "none";
-      startButton.disabled = false;
-      startButton.textContent = "Retry Connection";
+      if (startButton) {
+        startButton.disabled = false;
+        startButton.textContent = "Retry Connection";
+      }
     }
   }
 }

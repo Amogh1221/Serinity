@@ -42,6 +42,7 @@ class LLM3Output(BaseModel):
     unclear_areas: List[str]
     risk_assessment: str
     protective_factors: List[str]
+    updated_primary_concern: Optional[str] = None
 
 class RiskSignal(Protocol):
     """
@@ -61,7 +62,7 @@ class LLMProvider(Protocol):
         """Generate the system/user prompt context for starting a session."""
         ...
 
-    def psychiatrist_response(self, context: list) -> LLM1Output:
+    def psychiatrist_response(self, context: list, patient_info: dict = None) -> LLM1Output:
         """Generate a conversational response mimicking a psychiatrist (LLM1 fast path)."""
         ...
 
@@ -73,7 +74,7 @@ class LLMProvider(Protocol):
         """Synthesize a final response to a user's query using retrieved clinical guidelines (LLM1 sync path)."""
         ...
         
-    def generate_end_of_session_profile(self, old_profile: dict, session_history: list) -> 'LLM3Output':
+    def generate_end_of_session_profile(self, old_profile: dict, session_history: list, patient_info: dict = None) -> 'LLM3Output':
         """Generate a concise session summary and fully merged clinical profile (LLM3 post-session path)."""
         ...
 

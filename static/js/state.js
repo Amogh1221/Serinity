@@ -1,5 +1,5 @@
 export const state = {
-  sessionId: null,
+  sessionId: sessionStorage.getItem("serinity_session_id") || null,
   patientId: localStorage.getItem("serinity_patient_id") || null,
   isListening: false,
   isRecordingPending: false,
@@ -21,5 +21,10 @@ export const state = {
   
   setSessionId(id) {
     this.sessionId = id;
+    if (id) {
+      sessionStorage.setItem("serinity_session_id", id);
+    } else {
+      sessionStorage.removeItem("serinity_session_id");
+    }
   }
 };

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 class ResetRequest(BaseModel):
@@ -20,7 +20,7 @@ class StartRequest(BaseModel):
 class PatientCreateRequest(BaseModel):
     """Payload for creating a new patient record."""
     name: str
-    age: Optional[int] = None
+    age: Optional[int] = Field(None, ge=5, le=99)
     gender: Optional[str] = None
     occupation: Optional[str] = None
     primary_concern: Optional[str] = None

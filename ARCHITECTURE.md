@@ -1,6 +1,6 @@
 # Serinity System Architecture
 
-Serinity is designed as a modular, local-first multi-agent system. The architecture prioritizes data privacy, robust clinical safety, and low-latency offline execution.
+Serinity is designed as a modular multi-agent system with a **Dual-Environment Architecture**. Depending on the `CLOUD_MODE` environment toggle, the system operates either entirely on-device (prioritizing 100% data privacy and offline capability) or leverages cloud infrastructure (prioritizing scalability, remote databases, and advanced LLMs).
 
 ## System Diagram
 
@@ -17,44 +17,64 @@ graph TD
         Router["API Routers"]
         AudioProc["SenseVoice STT"]
         CO["Conversation Orchestrator"]
-        RAG["ChromaDB Retriever"]
+        Logger["Logging Module"]
     end
 
-    %% Multi-Agent LLM Layer
-    subgraph MultiAgent ["Ollama Local LLMs"]
-        LLM1["Agent 1: Clinical Interviewer"]
-        LLM2["Agent 2: Pattern Analyst"]
-        LLM3["Agent 3: Profile Manager"]
+    %% Abstraction Layer
+    subgraph Interfaces ["Provider Abstractions"]
+        LLM_Interface["LLM Provider"]
+        DB_Interface["Memory Store"]
+        Vec_Interface["Vector Store"]
+        Email_Interface["Email / OTP Service"]
     end
 
-    %% Storage Layer
-    subgraph Storage ["Local File System"]
-        PD["Patient Profiles JSON"]
-        VD["Chroma Vector Store"]
-        History["Chat Transcripts"]
+    %% Local Providers (CLOUD_MODE = false)
+    subgraph Local ["Local Resources"]
+        Ollama["Ollama (Qwen/Phi)"]
+        SQLite["SQLite (Local DB)"]
+        Chroma["ChromaDB"]
+        LocalPrint["Terminal Print OTP"]
+        FileLog["Local File Logs"]
+    end
+
+    %% Cloud Providers (CLOUD_MODE = true)
+    subgraph Cloud ["Cloud Integrations"]
+        Groq["Groq API (Llama)"]
+        Turso["Turso DB (libSQL)"]
+        Pinecone["Pinecone Vector DB"]
+        Brevo["Brevo Email API"]
+        BetterStack["BetterStack (Logtail)"]
     end
 
     %% Data Flow
-    A -->|Chat Message| Router
+    A -->|Chat / Auth| Router
     Mic -->|Audio Blob| AudioProc
     AudioProc -->|Transcribed Text| Router
     
     Router --> CO
+    Router --> Logger
     
-    CO -->|Fetch Context| RAG
-    RAG -->|Sims' Symptoms| CO
-    
-    CO -->|User Input + Context| LLM1
-    LLM1 -->|Intent & Follow-up| CO
-    
-    CO -->|If Intent=ANALYZE| LLM2
-    LLM2 -->|Delta Analysis| CO
-    
-    CO -->|Background Task| LLM3
-    LLM3 -->|Update JSON| PD
-    
-    CO -->|Final Response| A
-    CO -->|Save Transcript| History
+    %% Provider Routing
+    CO --> LLM_Interface
+    CO --> DB_Interface
+    CO --> Vec_Interface
+    CO --> Email_Interface
+
+    %% Conditional Routing
+    LLM_Interface -.->|Cloud Mode| Groq
+    LLM_Interface -.->|Local Mode| Ollama
+
+    DB_Interface -.->|Cloud Mode| Turso
+    DB_Interface -.->|Local Mode| SQLite
+
+    Vec_Interface -.->|Cloud Mode| Pinecone
+    Vec_Interface -.->|Local Mode| Chroma
+
+    Email_Interface -.->|Cloud Mode| Brevo
+    Email_Interface -.->|Local Mode| LocalPrint
+
+    Logger -.->|Cloud Mode| BetterStack
+    Logger -.->|Local Mode| FileLog
 ```
 
 ## Agentic Workflow Deep Dive
@@ -73,16 +93,16 @@ Serinity replaces the traditional single-prompt chatbot approach with a **Multi-
 - **Role:** Maintains longitudinal memory.
 - **Mechanism:** After the session ends or at set intervals, this agent runs in the background. It reads the session transcript and updates the user's permanent JSON profile across 8 specific domains (e.g., `emotional_themes`, `protective_factors`). It ensures the bot "remembers" the patient's history in future sessions without needing a massive context window.
 
-## Local vs. Cloud Components
+## Dual-Environment Component Matrix
 
-Serinity is **100% Local-First**.
+Serinity can dynamically route requests based on the `CLOUD_MODE` environment variable.
 
-| Component           | Technology                    | Execution Environment          |
+| Component           | Local Mode (`CLOUD_MODE=false`) | Cloud Mode (`CLOUD_MODE=true`) |
 | :--------------------| :------------------------------| :-------------------------------|
-| **Frontend UI**     | Vanilla HTML, CSS, JavaScript | Local Browser (localhost:8000) |
-| **Backend API**     | Python, FastAPI               | Local Server (localhost:8000)  |
-| **Speech-to-Text**  | SenseVoice                    | Local Device                   |
-| **LLM Inference**   | Ollama (Qwen2.5 7B)           | Local Device (CPU/GPU/NPU)     |
-| **Embeddings**      | Nomic-Embed-Text              | Local Device                   |
-| **Vector Database** | ChromaDB                      | Local File System              |
-| **Patient Data**    | JSON / TXT                    | Local File System              |
+| **LLM Inference**   | Ollama (Local device)         | Groq API                       |
+| **Vector Database** | ChromaDB (Local filesystem)   | Pinecone API                   |
+| **Relational DB**   | SQLite (`.db` file)           | Turso (libSQL API)             |
+| **Logging**         | File logs (`./logs`)          | BetterStack (Logtail API)      |
+| **OTP / Auth**      | Terminal stdout print         | Brevo API (SMTP/Email)         |
+| **Frontend UI**     | Vanilla HTML/JS (localhost)   | Vanilla HTML/JS                |
+| **Speech-to-Text**  | SenseVoice (Local device)     | *(Currently Local only)*       |

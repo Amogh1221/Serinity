@@ -16,12 +16,12 @@ const uiElements = {
 
 let typingNode = null;
 
-const screens = ["loadingScreen", "profileSelectionScreen", "dashboardScreen", "mainApp"];
+const screens = ["loadingScreen", "authScreen", "dashboardScreen", "mainApp"];
 
 export function getPathForScreen(screen) {
   const map = {
     "loadingScreen": "/",
-    "profileSelectionScreen": "/profiles",
+    "authScreen": "/login",
     "dashboardScreen": "/dashboard",
     "mainApp": "/session"
   };
@@ -217,4 +217,26 @@ export function showConfirm(title, text, callback) {
   };
   
   confirmationModal.style.display = "flex";
+}
+
+export function showAlert(title, text) {
+  const alertModal = document.getElementById("alertModal");
+  if (!alertModal) return alert(text); // Fallback
+
+  document.getElementById("alertModalTitle").textContent = title;
+  document.getElementById("alertModalText").textContent = text;
+  
+  const closeModal = () => {
+    alertModal.style.display = "none";
+  };
+
+  document.getElementById("alertModalOkBtn").onclick = closeModal;
+  
+  alertModal.onclick = (e) => {
+    if (e.target === alertModal) {
+      closeModal();
+    }
+  };
+  
+  alertModal.style.display = "flex";
 }

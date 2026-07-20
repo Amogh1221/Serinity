@@ -4,6 +4,7 @@ import * as ui from './ui.js';
 import * as audio from './audio.js';
 import * as profiles from './profiles.js';
 import * as session from './session.js';
+import * as auth from './auth.js';
 
 // DOM Elements specific to top-level app logic
 const startButton = document.getElementById("startButton");
@@ -25,13 +26,9 @@ function bindEvents() {
       ui.switchScreen(event.state.screen, false);
     } else {
       const path = window.location.pathname;
-      if (path === "/profiles") {
-        profiles.fetchPatients();
-        ui.switchScreen("profileSelectionScreen", false);
-      } else if (path === "/dashboard" || path === "/session") {
+      if (path === "/dashboard" || path === "/session") {
         if (!state.patientId) {
           profiles.fetchPatients();
-          ui.switchScreen("profileSelectionScreen", false);
         } else {
           ui.switchScreen(path === "/dashboard" ? "dashboardScreen" : "mainApp", false);
         }
@@ -41,16 +38,324 @@ function bindEvents() {
     }
   });
 
+  // Global Unauthorized Handler
+  window.addEventListener("unauthorized", () => {
+    ui.switchScreen("authScreen", false);
+  });
+
+  // --- Auth Events ---
+  const loginFormContainer = document.getElementById("loginFormContainer");
+  const signupFormContainer = document.getElementById("signupFormContainer");
+  const forgotPwdFormContainer = document.getElementById("forgotPwdFormContainer");
+  const otpStepContainer = document.getElementById("otpStepContainer");
+  const newPwdStepContainer = document.getElementById("newPwdStepContainer");
+  const signupOtpStepContainer = document.getElementById("signupOtpStepContainer");
+
+  // Track verified OTP state in memory (not persisted — refresh = back to login)
+  let _otpVerifiedEmail = null;
+
+  function showAuthPanel(panelId) {
+    // Only hide/show panels that exist
+    const panels = [loginFormContainer, signupFormContainer, forgotPwdFormContainer, otpStepContainer, newPwdStepContainer, signupOtpStepContainer];
+    panels.forEach(p => { 
+      if(p) { 
+        p.classList.add('hidden'); 
+        p.classList.remove('block'); 
+      } 
+    });
+    const target = document.getElementById(panelId);
+    if (target) {
+      target.classList.remove('hidden');
+      target.classList.add('block');
+    } else {
+      console.error("Auth panel not found:", panelId);
+    }
+  }
+
+  document.getElementById("showSignupBtn")?.addEventListener("click", () => showAuthPanel("signupFormContainer"));
+  document.getElementById("showForgotPwdBtn")?.addEventListener("click", () => showAuthPanel("forgotPwdFormContainer"));
+  document.getElementById("backToLoginBtn1")?.addEventListener("click", () => showAuthPanel("loginFormContainer"));
+  document.getElementById("backToLoginBtn2")?.addEventListener("click", () => showAuthPanel("loginFormContainer"));
+  document.getElementById("backToForgotBtn")?.addEventListener("click", () => showAuthPanel("forgotPwdFormContainer"));
+  document.getElementById("backToSignupBtn")?.addEventListener("click", () => showAuthPanel("signupFormContainer"));
+
+  // Populate Nationality Dropdown
+  const countries = [
+    "India", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", 
+    "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh", 
+    "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia", 
+    "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", 
+    "Burundi", "Côte d'Ivoire", "Cabo Verde", "Cambodia", "Cameroon", "Canada", "Central African Republic", 
+    "Chad", "Chile", "China", "Colombia", "Comoros", "Congo (Congo-Brazzaville)", "Costa Rica", 
+    "Croatia", "Cuba", "Cyprus", "Czechia (Czech Republic)", "Democratic Republic of the Congo", 
+    "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador", 
+    "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", 
+    "France", "Gabon", "Gambia", "Georgia", "Germany", "Ghana", "Greece", "Grenada", 
+    "Guatemala", "Guinea", "Guinea-Bissau", "Guyana", "Haiti", "Holy See", "Honduras", 
+    "Hungary", "Iceland", "Indonesia", "Iran", "Iraq", "Ireland", "Israel", "Italy", "Jamaica", 
+    "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan", "Laos", 
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg", 
+    "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta", "Marshall Islands", "Mauritania", 
+    "Mauritius", "Mexico", "Micronesia", "Moldova", "Monaco", "Mongolia", "Montenegro", "Morocco", 
+    "Mozambique", "Myanmar (formerly Burma)", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", 
+    "Nicaragua", "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", 
+    "Palau", "Palestine State", "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", 
+    "Portugal", "Qatar", "Romania", "Russia", "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", 
+    "Saint Vincent and the Grenadines", "Samoa", "San Marino", "Sao Tome and Principe", "Saudi Arabia", 
+    "Senegal", "Serbia", "Seychelles", "Sierra Leone", "Singapore", "Slovakia", "Slovenia", 
+    "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain", "Sri Lanka", 
+    "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Tajikistan", "Tanzania", "Thailand", 
+    "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", 
+    "Tuvalu", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom", "United States", "Uruguay", 
+    "Uzbekistan", "Vanuatu", "Venezuela", "Vietnam", "Yemen", "Zambia", "Zimbabwe"
+  ];
+  
+  const signupNationality = document.getElementById("signupNationality");
+  const nationalityDropdown = document.getElementById("nationalityDropdown");
+  
+  if (signupNationality && nationalityDropdown) {
+    function renderCountries(filterText = "") {
+      nationalityDropdown.innerHTML = "";
+      const filtered = countries.filter(c => c.toLowerCase().includes(filterText.toLowerCase()));
+      filtered.forEach(country => {
+        const div = document.createElement("div");
+        div.className = "p-2 hover:bg-moss/20 cursor-pointer text-sm text-ink";
+        div.textContent = country;
+        div.onmousedown = (e) => {
+          e.preventDefault(); // prevent blur
+          signupNationality.value = country;
+          nationalityDropdown.classList.add("hidden");
+        };
+        nationalityDropdown.appendChild(div);
+      });
+      if (filtered.length === 0) {
+        const div = document.createElement("div");
+        div.className = "p-2 text-sm text-clay italic";
+        div.textContent = "No matches";
+        nationalityDropdown.appendChild(div);
+      }
+    }
+
+    signupNationality.addEventListener("focus", () => {
+      renderCountries(signupNationality.value);
+      nationalityDropdown.classList.remove("hidden");
+    });
+
+    signupNationality.addEventListener("input", (e) => {
+      renderCountries(e.target.value);
+      nationalityDropdown.classList.remove("hidden");
+    });
+
+    signupNationality.addEventListener("blur", () => {
+      nationalityDropdown.classList.add("hidden");
+    });
+  }
+
+  // Helper function to strip spaces from OTP input
+  function setupOtpInputStripper(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (field) {
+      field.addEventListener('input', (e) => {
+        // Remove all spaces from the input value
+        e.target.value = e.target.value.replace(/\s/g, '');
+      });
+    }
+  }
+
+  // Setup OTP input strippers for all OTP fields (signup, forgot password, delete account)
+  setupOtpInputStripper("signupOtpCode");
+  setupOtpInputStripper("resetOtpCode");
+  setupOtpInputStripper("deleteAccountOtpCode");
+
+  document.getElementById("loginBtn")?.addEventListener("click", async () => {
+    const user = document.getElementById("loginUsername").value.trim();
+    const pass = document.getElementById("loginPassword").value;
+    if (!user || !pass) return ui.showAlert("Login Error", "Please enter both username/email and password");
+    
+    try {
+      document.getElementById("loginBtn").textContent = "Logging In...";
+      await auth.login(user, pass);
+      document.getElementById("loginBtn").textContent = "Log In";
+      await profiles.fetchPatients();
+    } catch (e) {
+      ui.showAlert("Login Failed", e.message);
+      document.getElementById("loginBtn").textContent = "Log In";
+    }
+  });
+
+  let _signupPayload = null;
+
+  document.getElementById("signupGetOtpBtn")?.addEventListener("click", async () => {
+    const payload = {
+      name: document.getElementById("signupName").value.trim(),
+      username: document.getElementById("signupUsername").value.trim(),
+      email: document.getElementById("signupEmail").value.trim(),
+      password: document.getElementById("signupPassword").value,
+      gender: document.getElementById("signupGender").value,
+      age: parseInt(document.getElementById("signupAge").value) || null,
+      nationality: document.getElementById("signupNationality").value,
+      primary_concern: document.getElementById("signupConcern").value,
+      emergency_contact_name: document.getElementById("signupEmergencyName").value.trim() || null,
+      emergency_contact_phone: document.getElementById("signupEmergencyPhone").value.trim() || null
+    };
+
+    if (!payload.name || !payload.username || !payload.email || !payload.password || !payload.gender || !payload.nationality || !payload.primary_concern) {
+      return ui.showAlert("Signup Error", "Please fill out all required fields (*).");
+    }
+    
+    if (payload.password.length < 8) {
+      return ui.showAlert("Signup Error", "Password must be at least 8 characters long.");
+    }
+    
+    if (payload.age !== null && (payload.age < 5 || payload.age > 99)) {
+      return ui.showAlert("Signup Error", "Age must be between 5 and 99.");
+    }
+
+    try {
+      document.getElementById("signupGetOtpBtn").textContent = "Sending OTP...";
+      document.getElementById("signupGetOtpBtn").disabled = true;
+      
+      await auth.requestSignupOtp(payload.email, payload.username);
+      
+      _signupPayload = payload;
+      
+      // Clear OTP code and switch to signup OTP panel
+      const signupOtpCodeField = document.getElementById("signupOtpCode");
+      if (signupOtpCodeField) {
+        signupOtpCodeField.value = "";
+      }
+      showAuthPanel("signupOtpStepContainer");
+      
+    } catch (e) {
+      ui.showAlert("Signup Failed", e.message);
+    } finally {
+      document.getElementById("signupGetOtpBtn").textContent = "Get OTP";
+      document.getElementById("signupGetOtpBtn").disabled = false;
+    }
+  });
+
+  document.getElementById("signupCompleteBtn")?.addEventListener("click", async () => {
+    if (!_signupPayload) {
+      return ui.showAlert("Signup Error", "Missing signup details. Please refresh and try again.");
+    }
+    
+    const signupOtpCodeField = document.getElementById("signupOtpCode");
+    if (!signupOtpCodeField) {
+      return ui.showAlert("Signup Error", "OTP code field not found. Please refresh and try again.");
+    }
+    
+    const otpCode = signupOtpCodeField.value.trim();
+    if (otpCode.length !== 6) {
+      return ui.showAlert("Signup Error", "Please enter the 6-digit OTP code.");
+    }
+    
+    try {
+      const completeBtn = document.getElementById("signupCompleteBtn");
+      if (completeBtn) {
+        completeBtn.textContent = "Creating Account...";
+        completeBtn.disabled = true;
+      }
+      
+      const payload = {
+        ..._signupPayload,
+        otp_code: otpCode
+      };
+      
+      await auth.signup(payload);
+      
+      _signupPayload = null;
+      if (signupOtpCodeField) {
+        signupOtpCodeField.value = "";
+      }
+      
+      // Account created successfully, go back to login
+      ui.showAlert("Success", "Account created successfully!");
+      showAuthPanel("loginFormContainer");
+      
+      await profiles.fetchPatients();
+    } catch (e) {
+      ui.showAlert("Signup Failed", e.message);
+    } finally {
+      const completeBtn = document.getElementById("signupCompleteBtn");
+      if (completeBtn) {
+        completeBtn.textContent = "Complete Signup";
+        completeBtn.disabled = false;
+      }
+    }
+  });
+
+  document.getElementById("requestOtpBtn")?.addEventListener("click", async () => {
+    const email = document.getElementById("forgotPwdEmail").value.trim();
+    if (!email) return ui.showAlert("Reset Password", "Please enter your email.");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return ui.showAlert("Reset Password", "Please enter a valid email address.");
+    try {
+      document.getElementById("requestOtpBtn").textContent = "Sending...";
+      document.getElementById("requestOtpBtn").disabled = true;
+      await auth.forgotPassword(email);
+      document.getElementById("resetOtpCode").value = "";
+      showAuthPanel("otpStepContainer");
+    } catch(e) {
+      ui.showAlert("Reset Password", e.message);
+    } finally {
+      document.getElementById("requestOtpBtn").textContent = "Send Code";
+      document.getElementById("requestOtpBtn").disabled = false;
+    }
+  });
+
+  document.getElementById("verifyOtpBtn")?.addEventListener("click", async () => {
+    const email = document.getElementById("forgotPwdEmail").value.trim();
+    const otp = document.getElementById("resetOtpCode").value.trim();
+    if (otp.length !== 6) return ui.showAlert("Reset Password", "Please enter the 6-digit code.");
+    try {
+      document.getElementById("verifyOtpBtn").textContent = "Verifying...";
+      document.getElementById("verifyOtpBtn").disabled = true;
+      await auth.verifyOtp(email, otp);
+      _otpVerifiedEmail = email;
+      document.getElementById("resetNewPassword").value = "";
+      showAuthPanel("newPwdStepContainer");
+    } catch(e) {
+      ui.showAlert("Verification Failed", e.message);
+    } finally {
+      document.getElementById("verifyOtpBtn").textContent = "Verify Code";
+      document.getElementById("verifyOtpBtn").disabled = false;
+    }
+  });
+
+  document.getElementById("submitResetBtn")?.addEventListener("click", async () => {
+    // If _otpVerifiedEmail is null, this means a refresh happened — redirect to login
+    if (!_otpVerifiedEmail) {
+      showAuthPanel("loginFormContainer");
+      return;
+    }
+    const newPass = document.getElementById("resetNewPassword").value;
+    if (!newPass || newPass.length < 8) return ui.showAlert("Reset Password", "New password must be at least 8 characters long.");
+    try {
+      document.getElementById("submitResetBtn").textContent = "Updating...";
+      document.getElementById("submitResetBtn").disabled = true;
+      const otp = document.getElementById("resetOtpCode").value.trim();
+      await auth.resetPassword(_otpVerifiedEmail, otp, newPass);
+      _otpVerifiedEmail = null;
+      ui.showAlert("Success", "Password reset successfully! Please log in.");
+      showAuthPanel("loginFormContainer");
+    } catch (e) {
+      ui.showAlert("Reset Failed", e.message);
+    } finally {
+      document.getElementById("submitResetBtn").textContent = "Update Password";
+      document.getElementById("submitResetBtn").disabled = false;
+    }
+  });
+
   // --- Profiles & Dashboard Events ---
 
   const patientDropdown = document.getElementById("patientDropdown");
   if (patientDropdown) patientDropdown.onchange = profiles.toggleSelectButton;
 
-  const dashboardBackBtn = document.getElementById("dashboardBackBtn");
-  if (dashboardBackBtn) {
-    dashboardBackBtn.onclick = () => {
-      ui.switchScreen("profileSelectionScreen");
-      profiles.fetchPatients();
+  const dashboardLogoutBtn = document.getElementById("dashboardLogoutBtn");
+  if (dashboardLogoutBtn) {
+    dashboardLogoutBtn.onclick = () => {
+      auth.logout();
+      ui.switchScreen("authScreen");
     };
   }
 
@@ -79,24 +384,71 @@ function bindEvents() {
   const dashboardDeleteBtn = document.getElementById("dashboardDeleteBtn");
   if (dashboardDeleteBtn) {
     dashboardDeleteBtn.onclick = () => {
-      ui.showConfirm(
-        "Delete Profile?",
-        "Are you sure you want to completely delete this profile? This action is irreversible and all data will be erased.",
-        async () => {
-          const idToDelete = state.patientId;
-          state.setPatientId(null);
-          try {
-            await api.deletePatientProfile(idToDelete);
-          } catch (e) {
-            console.error("Error deleting profile:", e);
-          }
-          ui.switchScreen("profileSelectionScreen");
-          profiles.fetchPatients();
-        }
-      );
+      document.getElementById("deleteAccountConfirmModal").style.display = "flex";
     };
   }
 
+  const deleteAccountCancelBtn = document.getElementById("deleteAccountCancelBtn");
+  if (deleteAccountCancelBtn) {
+    deleteAccountCancelBtn.onclick = () => {
+      document.getElementById("deleteAccountConfirmModal").style.display = "none";
+    };
+  }
+
+  const deleteAccountSendOtpBtn = document.getElementById("deleteAccountSendOtpBtn");
+  if (deleteAccountSendOtpBtn) {
+    deleteAccountSendOtpBtn.onclick = async () => {
+      try {
+        deleteAccountSendOtpBtn.textContent = "Sending OTP...";
+        deleteAccountSendOtpBtn.disabled = true;
+        
+        await auth.requestDeleteAccountOtp();
+        
+        // Close confirmation modal and show OTP modal
+        document.getElementById("deleteAccountConfirmModal").style.display = "none";
+        document.getElementById("deleteAccountOtpCode").value = "";
+        document.getElementById("deleteAccountOtpModal").style.display = "flex";
+        
+      } catch (e) {
+        console.error("Error requesting OTP:", e);
+        ui.showAlert("Error", e.message);
+      } finally {
+        deleteAccountSendOtpBtn.textContent = "SEND OTP";
+        deleteAccountSendOtpBtn.disabled = false;
+      }
+    };
+  }
+
+  const closeDeleteOtpModalBtn = document.getElementById("closeDeleteOtpModalBtn");
+  if (closeDeleteOtpModalBtn) {
+    closeDeleteOtpModalBtn.onclick = () => {
+      document.getElementById("deleteAccountOtpModal").style.display = "none";
+    };
+  }
+
+  const submitDeleteOtpBtn = document.getElementById("submitDeleteOtpBtn");
+  if (submitDeleteOtpBtn) {
+    submitDeleteOtpBtn.onclick = async () => {
+      const code = document.getElementById("deleteAccountOtpCode").value.trim();
+      if (code.length !== 6) return ui.showAlert("Error", "Please enter a valid 6-digit code.");
+      try {
+        submitDeleteOtpBtn.textContent = "Verifying...";
+        submitDeleteOtpBtn.disabled = true;
+        
+        await auth.verifyDeleteAccount(code);
+        
+        document.getElementById("deleteAccountOtpModal").style.display = "none";
+        auth.logout();
+        ui.switchScreen("authScreen");
+        
+      } catch (e) {
+        ui.showAlert("Error", e.message);
+      } finally {
+        submitDeleteOtpBtn.textContent = "Verify & Delete";
+        submitDeleteOtpBtn.disabled = false;
+      }
+    };
+  }
   const dashboardStartBtn = document.getElementById("dashboardStartBtn");
   if (dashboardStartBtn) {
     dashboardStartBtn.onclick = async () => {
@@ -161,13 +513,13 @@ function bindEvents() {
       const occupation = occupationInput ? occupationInput.value.trim() : null;
 
       if (!name || !age || !gender || !occupation) {
-        alert("Please fill out all 4 required fields (Name, Age, Gender, and Occupation) to create a new profile.");
+        ui.showAlert("Missing Information", "Please fill out all 4 required fields (Name, Age, Gender, and Occupation) to create a new profile.");
         return;
       }
       
       const parsedAge = parseInt(age);
-      if (isNaN(parsedAge) || parsedAge < 5 || parsedAge > 100) {
-        alert("Age must be between 5 and 100.");
+      if (isNaN(parsedAge) || parsedAge < 5 || parsedAge > 99) {
+        ui.showAlert("Invalid Age", "Age must be between 5 and 99.");
         return;
       }
 
@@ -184,17 +536,32 @@ function bindEvents() {
         await profiles.showDashboard(state.patientId);
       } catch (e) {
         console.error("Failed to create profile:", e);
-        alert("Failed to create patient profile. Please try again.");
+        ui.showAlert("Error", "Failed to create patient profile. Please try again.");
       }
     };
   }
 
   if (startButton) {
-    startButton.onclick = () => {
-      if (startButton.textContent === "Start Consultation") {
-        ui.switchScreen("profileSelectionScreen");
-        profiles.fetchPatients();
-      } else if (startButton.textContent === "Retry Connection") {
+    startButton.onclick = async () => {
+      const text = startButton.textContent.trim();
+      if (text.includes("Start Consultation")) {
+        if (!auth.isAuthenticated()) {
+          ui.switchScreen("authScreen", false);
+          return;
+        }
+        
+        startButton.textContent = "Loading...";
+        startButton.disabled = true;
+        try {
+          await profiles.fetchPatients();
+        } catch(e) {
+          console.error(e);
+          ui.showAlert("Error", "Failed to load dashboard. Check console.");
+        } finally {
+          startButton.textContent = "Start Consultation";
+          startButton.disabled = false;
+        }
+      } else if (text.includes("Retry")) {
         startButton.textContent = "Initializing...";
         startButton.disabled = true;
         session.initializeSession();

@@ -1,9 +1,14 @@
+"""
+Conversation Orchestrator Service
+Coordinates the conversation logic, manages LLM calls, and interfaces with the risk assessment service.
+"""
+
 import time
 from typing import Optional
 from core.ports import LLMProvider, VectorStore, SessionStore, ProfileStore, LLM1Output
 from core.schemas import ChatResult
 from services.risk_assessment_service import RiskAssessmentService
-from core.logger import get_logger
+from core.logger import get_logger, serinity_logger
 
 class ConversationOrchestrator:
     """
@@ -50,45 +55,58 @@ class ConversationOrchestrator:
         
         history = self.session_store.get_working_context(session_id, llm_engine=self.llm_provider)
         
-        llm1_response = self.llm_provider.psychiatrist_response(history)
-        log.llm1_decision(llm1_response)
-        
-        base_risk = self.risk_service.assess(message, llm1_response, None)
-        
-        intent = llm1_response.intent
-        if base_risk and intent != "ANALYZE":
-            intent = "ANALYZE"
+        try:
+            llm1_response = self.llm_provider.psychiatrist_response(history, patient_info)
+            log.llm1_decision(llm1_response)
             
-        final_message = llm1_response.assistant_message
-
-        # Sync fast-path for user queries
-        if intent == "QUERY" and llm1_response.search_query:
-            retrieved_context = self.vector_store.retrieve(llm1_response.search_query, k=3)
-            log.analyze_triggered(llm1_response.search_query, "query")
-            log.retrieved_context(retrieved_context)
-            final_message = self.llm_provider.psychiatrist_query_response(history, retrieved_context)
+            base_risk = self.risk_service.assess(message, llm1_response, None)
             
-        # Synchronous execution of LLM2 pipeline
-        if intent == "ANALYZE" and patient_id:
-            llm2_message = self._run_sync_analysis(session_id, patient_id, llm1_response.clinical_summary)
-            if llm2_message:
-                final_message = llm2_message
+            intent = llm1_response.intent
+            if base_risk and intent != "ANALYZE":
+                intent = "ANALYZE"
+                
+            final_message = llm1_response.assistant_message
 
-        self.session_store.append_message(session_id, "assistant", final_message)
-        latency_ms = int((time.time() - start_time) * 1000)
-        log.assistant_reply(final_message, risk_injected=base_risk, latency_ms=latency_ms)
-        
-        chat_result = ChatResult(
-            assistant_message=final_message,
-            intent=intent,
-            risk_flagged=base_risk,
-            job_id=None,
-            clinical_summary=llm1_response.clinical_summary
-        )
+            # Sync fast-path for user queries
+            if intent == "QUERY" and llm1_response.search_query:
+                retrieved_context = self.vector_store.retrieve(llm1_response.search_query, k=5)
+                log.analyze_triggered(llm1_response.search_query, "query")
+                log.retrieved_context(retrieved_context)
+                final_message = self.llm_provider.psychiatrist_query_response(history, retrieved_context)
+                
+            # Synchronous execution of LLM2 pipeline
+            if intent == "ANALYZE" and patient_id:
+                llm2_message = self._run_sync_analysis(session_id, patient_id, llm1_response.clinical_summary, llm1_response.assistant_message)
+                if llm2_message:
+                    final_message = llm2_message
+
+            self.session_store.append_message(session_id, "assistant", final_message)
+            latency_ms = int((time.time() - start_time) * 1000)
+            log.assistant_reply(final_message, risk_injected=base_risk, latency_ms=latency_ms)
             
-        return chat_result
+            chat_result = ChatResult(
+                assistant_message=final_message,
+                intent=intent,
+                risk_flagged=base_risk,
+                job_id=None,
+                clinical_summary=llm1_response.clinical_summary
+            )
+                
+            return chat_result
+        except Exception as e:
+            log.error("handle_message_failed", e)
+            serinity_logger.error(f"Error in handle_message: {str(e)}")
+            fallback_message = "I'm having a little trouble connecting my thoughts right now. Could you repeat that?"
+            self.session_store.append_message(session_id, "assistant", fallback_message)
+            return ChatResult(
+                assistant_message=fallback_message,
+                intent="UNKNOWN",
+                risk_flagged=False,
+                job_id=None,
+                clinical_summary=None
+            )
 
-    def _run_sync_analysis(self, session_id: str, patient_id: str, clinical_summary: Optional[str] = None) -> Optional[str]:
+    def _run_sync_analysis(self, session_id: str, patient_id: str, clinical_summary: Optional[str] = None, llm1_draft: Optional[str] = None) -> Optional[str]:
         """
         Executes the heavy LLM2 pattern analysis synchronously and returns the LLM2 generated response.
         """
@@ -113,7 +131,20 @@ class ConversationOrchestrator:
             
             existing_profile_recap = self.profile_store.build_profile_recap(patient_id) or "No previous clinical profile exists for this patient."
             
+            patient_info = self.profile_store.get_patient(patient_id) if patient_id else None
+            demographics = ""
+            if patient_info:
+                demographics = (
+                    f"PATIENT DEMOGRAPHICS:\n"
+                    f"- Name: {patient_info.get('name', 'Unknown')}\n"
+                    f"- Age: {patient_info.get('age', 'Unknown')}\n"
+                    f"- Gender: {patient_info.get('gender', 'Unknown')}\n"
+                    f"- Nationality: {patient_info.get('nationality', 'Unknown')}\n"
+                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}\n\n"
+                )
+            
             context_prompt = (
+                f"{demographics}"
                 f"Existing Clinical Profile:\n{existing_profile_recap}\n\n"
             )
             if clinical_summary and clinical_summary.strip():
@@ -121,7 +152,16 @@ class ConversationOrchestrator:
                 
             context_prompt += (
                 f"Retrieved Clinical Reference (Sims' Symptoms in the Mind):\n{retrieved_context}\n\n"
-                "Please perform pattern analysis across all eight domains. Evaluate how the user is behaving now (based on the current session messages and summary) compared to their existing profile, and output the updated patterns."
+            )
+
+            if llm1_draft:
+                context_prompt += (
+                    f"Intern's Draft Response:\n{llm1_draft}\n\n"
+                )
+
+            context_prompt += (
+                "Please perform pattern analysis across all eight domains. Evaluate how the user is behaving now (based on the current session messages and summary) compared to their existing profile, and output the updated patterns. "
+                "You must also review the Intern's Draft Response, refine and amplify it using your deeper clinical insights, and provide the final polished conversational response."
             )
             
             llm2_input = history[-10:] + [{
@@ -132,9 +172,10 @@ class ConversationOrchestrator:
             log.llm2_output(llm2_response)
             
             self.profile_store.update_long_term_memory(patient_id, llm2_response)
-            print(f"[Orchestrator] Synchronous analysis completed for patient {patient_id}.")
+            serinity_logger.info(f"Synchronous analysis completed for patient {patient_id}.")
             return llm2_response.assistant_message
             
         except Exception as e:
-            print(f"[Orchestrator] Synchronous analysis failed: {e}")
+            log.error("sync_analysis_failed", e)
+            serinity_logger.error(f"Synchronous analysis failed: {e}")
             return None

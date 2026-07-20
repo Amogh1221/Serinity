@@ -46,9 +46,21 @@ class OllamaLLMProvider:
                 }
             ]
         
-    def psychiatrist_response(self, context: list) -> LLM1Output:
+    def psychiatrist_response(self, context: list, patient_info: dict = None) -> LLM1Output:
         try:
-            messages = [{"role": "system", "content": LLM1_SYSTEM_PROMPT}]
+            sys_prompt = LLM1_SYSTEM_PROMPT
+            if patient_info:
+                demographics = (
+                    f"PATIENT DEMOGRAPHICS:\n"
+                    f"- Name: {patient_info.get('name', 'Unknown')}\n"
+                    f"- Age: {patient_info.get('age', 'Unknown')}\n"
+                    f"- Gender: {patient_info.get('gender', 'Unknown')}\n"
+                    f"- Nationality: {patient_info.get('nationality', 'Unknown')}\n"
+                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}\n\n"
+                )
+                sys_prompt = demographics + sys_prompt
+                
+            messages = [{"role": "system", "content": sys_prompt}]
             for m in context:
                 messages.append({"role": m["role"], "content": m["content"]})
 
@@ -57,7 +69,7 @@ class OllamaLLMProvider:
                     model=self.model1,
                     messages=messages,
                     format=LLM1Output.model_json_schema(),
-                    options={"temperature": 0.6, "num_predict": 1024},
+                    options={"temperature": 0.6, "num_predict": 1024, "num_ctx": 8192},
                 )
             raw = response.message.content
             return LLM1Output.model_validate_json(raw)
@@ -81,7 +93,7 @@ class OllamaLLMProvider:
                     model=self.model2,
                     messages=messages,
                     format=LLM2Output.model_json_schema(),
-                    options={"temperature": 0.1, "num_predict": 1024},
+                    options={"temperature": 0.1, "num_predict": 1024, "num_ctx": 8192},
                     keep_alive=0,
                 )
             raw = response.message.content
@@ -116,15 +128,27 @@ class OllamaLLMProvider:
                 response = self._client().chat(
                     model=self.model1,
                     messages=messages,
-                    options={"temperature": 0.5, "num_predict": 512},
+                    options={"temperature": 0.5, "num_predict": 512, "num_ctx": 8192},
                 )
             return response.message.content.strip()
         except Exception as e:
             print(f"[QUERY ERROR] {e}")
             return "I hear you, and we will find a way through this together. Let's keep exploring what might help."
 
-    def generate_end_of_session_profile(self, old_profile: dict, session_history: list) -> LLM3Output:
+    def generate_end_of_session_profile(self, old_profile: dict, session_history: list, patient_info: dict = None) -> LLM3Output:
         try:
+            sys_prompt = LLM3_SYSTEM_PROMPT
+            if patient_info:
+                demographics = (
+                    f"PATIENT DEMOGRAPHICS:\n"
+                    f"- Name: {patient_info.get('name', 'Unknown')}\n"
+                    f"- Age: {patient_info.get('age', 'Unknown')}\n"
+                    f"- Gender: {patient_info.get('gender', 'Unknown')}\n"
+                    f"- Nationality: {patient_info.get('nationality', 'Unknown')}\n"
+                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}\n\n"
+                )
+                sys_prompt = demographics + sys_prompt
+            
             formatted_history = "\n".join(f"{t['role'].upper()}: {t['content']}" for t in session_history)
             user_prompt = (
                 f"EXISTING PROFILE:\n{old_profile}\n\n"
@@ -132,16 +156,16 @@ class OllamaLLMProvider:
                 "Please generate the 100-200 word session_summary and the merged, deduplicated clinical profile."
             )
             messages = [
-                {"role": "system", "content": LLM3_SYSTEM_PROMPT},
+                {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_prompt}
             ]
 
             with self._llm_lock:
                 response = self._client().chat(
-                    model=self.model2,
+                    model=self.model1,
                     messages=messages,
                     format=LLM3Output.model_json_schema(),
-                    options={"temperature": 0.2, "num_predict": 1500},
+                    options={"temperature": 0.2, "num_predict": 1500, "num_ctx": 8192},
                 )
             raw = response.message.content
             return LLM3Output.model_validate_json(raw)
@@ -182,7 +206,7 @@ class OllamaLLMProvider:
                 response = self._client().chat(
                     model=self.model1,
                     messages=messages,
-                    options={"temperature": 0.3, "num_predict": 300},
+                    options={"temperature": 0.3, "num_predict": 300, "num_ctx": 8192},
                 )
             return response.message.content.strip()
         except Exception as e:

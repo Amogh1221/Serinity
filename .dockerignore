@@ -1,0 +1,31 @@
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+__pycache__/
+*.pyc
+
+# Local Databases
+persistence/serinity.db
+test_db.sqlite
+chroma_db/
+pinecone_db/
+
+# Environment Variables
+.env
+.env.local
+
+# Git and IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Local Logs
+logs/
+*.log
+
+# Artifacts & Output
+brain/
+*.md

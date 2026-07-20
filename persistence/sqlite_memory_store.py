@@ -6,6 +6,17 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional, Any
 from core.ports import LLM2Output, LLMProvider
+from dotenv import load_dotenv
+
+try:
+    import libsql_experimental as libsql
+except ImportError:
+    libsql = None
+
+load_dotenv()
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+CLOUD_MODE = os.getenv("CLOUD_MODE", "false").lower() == "true"
 
 class SQLiteBaseStore:
     """Base class for SQLite stores providing connection and initialization."""
@@ -16,11 +27,15 @@ class SQLiteBaseStore:
     @contextmanager
     def _get_conn(self):
         """
-        Yields a short-lived SQLite connection wrapped in a transaction block.
+        Yields a short-lived SQLite/Turso connection wrapped in a transaction block.
         Ensures the connection is properly closed to prevent file descriptor/memory leaks.
         """
-        os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        if CLOUD_MODE and TURSO_DATABASE_URL and libsql:
+            conn = libsql.connect(TURSO_DATABASE_URL, auth_token=TURSO_AUTH_TOKEN)
+        else:
+            os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
+            conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            
         conn.row_factory = sqlite3.Row
         try:
             # The inner 'with conn:' handles committing or rolling back the transaction
@@ -32,14 +47,34 @@ class SQLiteBaseStore:
     def _init_db(self):
         with self._get_conn() as conn:
             conn.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT UNIQUE NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    nationality TEXT,
+                    emergency_contact TEXT,
+                    emergency_contact_name TEXT,
+                    emergency_contact_phone TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS otp_tokens (
+                    email TEXT PRIMARY KEY,
+                    otp_code TEXT NOT NULL,
+                    expires_at TIMESTAMP NOT NULL
+                );
+
                 CREATE TABLE IF NOT EXISTS patients (
                     patient_id      TEXT PRIMARY KEY,
+                    user_id         TEXT,
                     name            TEXT NOT NULL,
                     age             INTEGER,
                     gender          TEXT,
                     occupation      TEXT,
                     primary_concern TEXT,
-                    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
                 );
 
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -83,6 +118,12 @@ class SQLiteBaseStore:
                 pass 
                 
             try:
+                conn.execute("ALTER TABLE users ADD COLUMN emergency_contact_name TEXT")
+                conn.execute("ALTER TABLE users ADD COLUMN emergency_contact_phone TEXT")
+            except sqlite3.OperationalError:
+                pass 
+                
+            try:
                 conn.execute("ALTER TABLE patient_profile ADD COLUMN long_term_memory_json TEXT NOT NULL DEFAULT '{}'")
             except sqlite3.OperationalError:
                 pass 
@@ -97,6 +138,11 @@ class SQLiteBaseStore:
             except sqlite3.OperationalError:
                 pass 
 
+            try:
+                conn.execute("ALTER TABLE patients ADD COLUMN user_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+
     def _now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
 
@@ -110,13 +156,14 @@ class SQLiteProfileStore(SQLiteBaseStore):
         age: Optional[int] = None, 
         gender: Optional[str] = None, 
         occupation: Optional[str] = None, 
-        primary_concern: Optional[str] = None
+        primary_concern: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> str:
         patient_id = str(uuid.uuid4())
         with self._get_conn() as conn:
             conn.execute(
-                "INSERT INTO patients(patient_id, name, age, gender, occupation, primary_concern) VALUES(?,?,?,?,?,?)",
-                (patient_id, name, age, gender, occupation, primary_concern),
+                "INSERT INTO patients(patient_id, user_id, name, age, gender, occupation, primary_concern) VALUES(?,?,?,?,?,?,?)",
+                (patient_id, user_id, name, age, gender, occupation, primary_concern),
             )
         return patient_id
 
@@ -127,13 +174,33 @@ class SQLiteProfileStore(SQLiteBaseStore):
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def list_patients_for_user(self, user_id: str) -> list[dict]:
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                "SELECT patient_id, name, age, gender, occupation, primary_concern, created_at FROM patients WHERE user_id=? ORDER BY name",
+                (user_id,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
     def get_patient(self, patient_id: str) -> dict:
         with self._get_conn() as conn:
             row = conn.execute(
-                "SELECT patient_id, name, age, gender, occupation, primary_concern, created_at FROM patients WHERE patient_id=?",
+                """
+                SELECT p.patient_id, p.name, p.age, p.gender, p.occupation, p.primary_concern, p.created_at, u.nationality
+                FROM patients p
+                LEFT JOIN users u ON p.user_id = u.id
+                WHERE p.patient_id=?
+                """,
                 (patient_id,),
             ).fetchone()
         return dict(row) if row else {}
+
+    def update_primary_concern(self, patient_id: str, new_concern: str) -> None:
+        with self._get_conn() as conn:
+            conn.execute(
+                "UPDATE patients SET primary_concern=? WHERE patient_id=?",
+                (new_concern, patient_id)
+            )
 
     def get_patient_profile(self, patient_id: str) -> dict:
         with self._get_conn() as conn:
@@ -236,9 +303,21 @@ class SQLiteProfileStore(SQLiteBaseStore):
 
         lines = ["[Returning patient — prior session context (not to be quoted back verbatim)]:"]
 
-        recap = memory.get("last_session_summary")
-        if recap:
-            lines.append(f"Last session summary: {recap}")
+        sessions = self.get_patient_sessions(patient_id)
+        valid_summaries = []
+        for s in sessions:
+            summ = s.get("rolling_summary")
+            if summ and summ.strip() and "no summary available" not in summ.lower():
+                valid_summaries.append(summ)
+            if len(valid_summaries) >= 3:
+                break
+        
+        if valid_summaries:
+            # Reverse to be chronologically ordered (oldest to newest)
+            valid_summaries.reverse()
+            lines.append("Recent session summaries:")
+            for i, summ in enumerate(valid_summaries):
+                lines.append(f"  - {summ}")
         if memory.get("emotional_themes"):
             lines.append(f"Emotional themes: {'; '.join(memory['emotional_themes'][:4])}")
         if memory.get("stressors"):
@@ -257,7 +336,7 @@ class SQLiteProfileStore(SQLiteBaseStore):
             conn.execute("DELETE FROM messages WHERE session_id IN (SELECT session_id FROM sessions WHERE patient_id = ?)", (patient_id,))
             conn.execute("DELETE FROM sessions WHERE patient_id = ?", (patient_id,))
             conn.execute(
-                "UPDATE patient_profile SET profile_json = '{}', updated_at = ? WHERE patient_id = ?",
+                "UPDATE patient_profile SET profile_json = '{}', long_term_memory_json = '{}', updated_at = ? WHERE patient_id = ?",
                 (self._now(), patient_id)
             )
 
@@ -337,13 +416,6 @@ class SQLiteSessionStore(SQLiteBaseStore):
                 (patient_id,)
             ).fetchone()
         return row["session_id"] if row else None
-
-    def end_session(self, session_id: str) -> None:
-        with self._get_conn() as conn:
-            conn.execute(
-                "UPDATE sessions SET is_active=0 WHERE session_id=?",
-                (session_id,)
-            )
 
     def get_all_messages(self, session_id: str) -> list[dict]:
         with self._get_conn() as conn:

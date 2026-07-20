@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Request, Response, BackgroundTasks
+"""
+Main API Routes
+Handles patient management, dashboard, and conversation endpoints.
+"""
+
+from fastapi import APIRouter, Depends, UploadFile, File, Request, Response, BackgroundTasks, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -11,14 +16,13 @@ from core.schemas import (
 from api.dependencies import (
     get_orchestrator, get_patient_service, 
     get_stt_provider, get_profile_store, get_session_store,
+    get_current_user,
     ConversationOrchestrator, PatientService
 )
 from core.ports import ProfileStore, SessionStore, STTProvider
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
-
-# Removed hardcoded crisis string, handled by frontend now
 
 @router.get("/health")
 def health():
@@ -30,15 +34,29 @@ def home(request: Request):
     """Serves the main frontend Single Page Application (SPA)."""
     return templates.TemplateResponse(request, "index.html")
 
+
+
 @router.get("/patients")
-def get_patients(profile_store: ProfileStore = Depends(get_profile_store)):
-    """Retrieve a list of all registered patients."""
-    return profile_store.list_patients()
+def get_patients(profile_store: ProfileStore = Depends(get_profile_store), user: dict = Depends(get_current_user)):
+    """Retrieve a list of all registered patients for the logged-in user."""
+    patients = profile_store.list_patients_for_user(user["id"])
+    if not patients:
+        # Auto-create a default profile for older accounts that lack one
+        patient_id = profile_store.create_patient(
+            name=user.get("username", "User"),
+            age=None,
+            gender=None,
+            primary_concern=None,
+            user_id=user["id"]
+        )
+        return [{"patient_id": patient_id, "name": user.get("username", "User")}]
+    return patients
 
 @router.post("/patients/create")
 def create_new_patient(
     request: PatientCreateRequest, 
-    profile_store: ProfileStore = Depends(get_profile_store)
+    profile_store: ProfileStore = Depends(get_profile_store),
+    user: dict = Depends(get_current_user)
 ):
     """Create a new patient record in the database."""
     p_id = profile_store.create_patient(
@@ -46,14 +64,16 @@ def create_new_patient(
         age=request.age,
         gender=request.gender,
         occupation=request.occupation,
-        primary_concern=request.primary_concern
+        primary_concern=request.primary_concern,
+        user_id=user["id"]
     )
     return {"patient_id": p_id, "name": request.name}
 
 @router.get("/patients/{patient_id}/dashboard")
 def patient_dashboard(
     patient_id: str, 
-    profile_store: ProfileStore = Depends(get_profile_store)
+    profile_store: ProfileStore = Depends(get_profile_store),
+    user: dict = Depends(get_current_user)
 ):
     """Retrieve full dashboard data for a patient (info, profile, past sessions)."""
     patient_info = profile_store.get_patient(patient_id)
@@ -72,7 +92,8 @@ def patient_dashboard(
 @router.post("/patients/{patient_id}/reset")
 def reset_patient(
     patient_id: str,
-    patient_service: PatientService = Depends(get_patient_service)
+    patient_service: PatientService = Depends(get_patient_service),
+    user: dict = Depends(get_current_user)
 ):
     """Reset the patient's data, including sessions, messages, and profile."""
     patient_service.reset_patient_data(patient_id)
@@ -81,7 +102,8 @@ def reset_patient(
 @router.delete("/patients/{patient_id}")
 def delete_patient(
     patient_id: str,
-    patient_service: PatientService = Depends(get_patient_service)
+    patient_service: PatientService = Depends(get_patient_service),
+    user: dict = Depends(get_current_user)
 ):
     """Delete a patient and all their associated data completely."""
     patient_service.delete_patient(patient_id)
@@ -91,7 +113,8 @@ def delete_patient(
 def end_session_endpoint(
     request: EndSessionRequest, 
     background_tasks: BackgroundTasks,
-    patient_service: PatientService = Depends(get_patient_service)
+    patient_service: PatientService = Depends(get_patient_service),
+    user: dict = Depends(get_current_user)
 ):
     """Gracefully terminate an active session and generate a clinical summary in the background."""
     patient_service.end_session(request.session_id, request.patient_id)
@@ -101,7 +124,8 @@ def end_session_endpoint(
 @router.post("/start")
 def start_session(
     request: StartRequest = StartRequest(), 
-    patient_service: PatientService = Depends(get_patient_service)
+    patient_service: PatientService = Depends(get_patient_service),
+    user: dict = Depends(get_current_user)
 ):
     """Initialize a new conversation session and generate the psychiatrist's opening remark."""
     session_id, opening_message, patient_id = patient_service.create_new_session(request.patient_id)
@@ -118,7 +142,8 @@ def chat_text(
     orchestrator: ConversationOrchestrator = Depends(get_orchestrator),
     patient_service: PatientService = Depends(get_patient_service),
     session_store: SessionStore = Depends(get_session_store),
-    profile_store: ProfileStore = Depends(get_profile_store)
+    profile_store: ProfileStore = Depends(get_profile_store),
+    user: dict = Depends(get_current_user)
 ):
     """
     Process a user's chat message through the core orchestrator.
@@ -131,12 +156,19 @@ def chat_text(
         request.session_id = session_id
         request.patient_id = patient_id
 
-    chat_result = orchestrator.handle_message(
-        session_id=request.session_id,
-        message=request.message,
-        emotion=request.emotion,
-        default_patient_id=request.patient_id
-    )
+    try:
+        chat_result = orchestrator.handle_message(
+            session_id=request.session_id,
+            message=request.message,
+            emotion=request.emotion,
+            default_patient_id=request.patient_id
+        )
+    except Exception as e:
+        error_str = str(e).lower()
+        error_type = type(e).__name__.lower()
+        if "rate limit" in error_str or "ratelimit" in error_str or "429" in error_str or "ratelimit" in error_type:
+            raise HTTPException(status_code=429, detail="Tokens Exhausted")
+        raise e
 
 
     return {
@@ -167,7 +199,8 @@ async def transcribe(
 @router.get("/patients/{patient_id}/active_session")
 def get_active_session(
     patient_id: str,
-    patient_service: PatientService = Depends(get_patient_service)
+    patient_service: PatientService = Depends(get_patient_service),
+    user: dict = Depends(get_current_user)
 ):
     """Check if the patient currently has an active session."""
     session_id = patient_service.get_active_session(patient_id)
@@ -176,7 +209,8 @@ def get_active_session(
 @router.get("/sessions/{session_id}/messages")
 def get_session_messages(
     session_id: str,
-    patient_service: PatientService = Depends(get_patient_service)
+    patient_service: PatientService = Depends(get_patient_service),
+    user: dict = Depends(get_current_user)
 ):
     """Retrieve all raw messages for a given session to continue a chat."""
     messages = patient_service.get_session_messages(session_id)

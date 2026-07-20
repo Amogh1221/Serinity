@@ -2,36 +2,19 @@ import { state } from './state.js';
 import * as api from './api.js';
 import * as ui from './ui.js';
 
-/**
- * Fetches the list of patients from the backend and populates the dropdown.
- */
 export async function fetchPatients() {
   try {
     const patients = await api.fetchPatientsList();
-    const dropdown = document.getElementById("patientDropdown");
-    dropdown.innerHTML = '<option value="">-- Choose Profile --</option>';
-    
-    patients.forEach(p => {
-      const opt = document.createElement("option");
-      opt.value = p.patient_id;
-      opt.textContent = `${p.name} (Age: ${p.age || 'N/A'})`;
-      if (p.patient_id === state.patientId) {
-        opt.selected = true;
-      }
-      dropdown.appendChild(opt);
-    });
-    toggleSelectButton();
+    if (patients.length > 0) {
+      state.patientId = patients[0].patient_id;
+      await showDashboard(state.patientId);
+    } else {
+      // This should never happen now since the backend auto-creates a profile, but just in case:
+      ui.showAlert("Profile Error", "No patient profile found. Please contact support.");
+    }
   } catch (err) {
-    console.error("Failed to load patient profiles:", err);
+    console.error("Failed to load patient profile:", err);
   }
-}
-
-/**
- * Enables or disables the 'Select' button based on dropdown selection.
- */
-export function toggleSelectButton() {
-  const dropdown = document.getElementById("patientDropdown");
-  document.getElementById("selectProfileBtn").disabled = !dropdown.value;
 }
 
 /**

@@ -31,6 +31,11 @@ export function loadVoices() {
     option.textContent = `${voice.name} (${voice.localService ? 'Local' : 'Network'})`;
     voiceSelect.appendChild(option);
   });
+
+  const googleUSEnglish = englishVoices.find(v => v.name === "Google US English");
+  if (googleUSEnglish) {
+    voiceSelect.value = googleUSEnglish.name;
+  }
 }
 
 if (window.speechSynthesis.onvoiceschanged !== undefined) {
@@ -64,7 +69,6 @@ export function speak(text) {
 
     setStatusText("Assistant is responding...");
 
-    // Keep it simple — exactly like the working test page.
     // No cancel(), no setTimeout. Just create and speak.
     currentUtterance = new SpeechSynthesisUtterance(cleanText);
 
