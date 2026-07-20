@@ -128,12 +128,18 @@ def start_session(
     user: dict = Depends(get_current_user)
 ):
     """Initialize a new conversation session and generate the psychiatrist's opening remark."""
-    session_id, opening_message, patient_id = patient_service.create_new_session(request.patient_id)
-    return {
-        "assistant_message": opening_message,
-        "session_id":        session_id,
-        "patient_id":        patient_id,
-    }
+    try:
+        session_id, opening_message, patient_id = patient_service.create_new_session(request.patient_id)
+        return {
+            "assistant_message": opening_message,
+            "session_id":        session_id,
+            "patient_id":        patient_id,
+        }
+    except Exception as e:
+        error_str = str(e).lower()
+        if "connection error" in error_str or "all providers failed" in error_str or "unavailable" in error_str:
+            raise HTTPException(status_code=503, detail="LLMs are currently unavailable. Cannot start session.")
+        raise e
 
 
 @router.post("/chat_text")
@@ -168,6 +174,8 @@ def chat_text(
         error_type = type(e).__name__.lower()
         if "rate limit" in error_str or "ratelimit" in error_str or "429" in error_str or "ratelimit" in error_type:
             raise HTTPException(status_code=429, detail="Tokens Exhausted")
+        if "connection error" in error_str or "all providers failed" in error_str or "unavailable" in error_str:
+            raise HTTPException(status_code=503, detail="LLMs are currently unavailable. Please try again later.")
         raise e
 
 
