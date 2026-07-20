@@ -18,10 +18,5 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Strip out binary files locally on the runner before pushing to Hugging Face
-          git config --global user.email "bot@github.com"
-          git config --global user.name "Deploy Bot"
-          git rm -rf icons/ || true
-          git commit -m "Strip binaries for HF deployment" || true
-          git remote add space https://Amogh1221:$HF_TOKEN@huggingface.co/spaces/Amogh1221/serinity
-          git push --force space HEAD:main
+          pip install -U "huggingface_hub[cli]"
+          huggingface-cli upload Amogh1221/serinity . . --repo-type space --exclude "icons/*" ".git/*" ".github/*" "tests/*" "scratch/*"
