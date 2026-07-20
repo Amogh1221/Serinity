@@ -181,7 +181,7 @@ export async function initializeSession(retryCount = 0) {
   const wakeupText = document.getElementById("wakeupText");
   
   if (retryCount === 0) {
-    if (wakeupText) wakeupText.textContent = "Waking up services...";
+    if (wakeupText) wakeupText.textContent = "Waking up backend (this may take up to a minute)...";
     if (startButton) {
       startButton.disabled = false;
       startButton.textContent = "Start Consultation";
