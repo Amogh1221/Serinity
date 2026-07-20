@@ -1,58 +1,60 @@
+---
+title: Serinity
+emoji: 🧠
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # Serinity: Local-First AI Psychiatrist
 
 **Serinity** is an offline-first, highly empathetic Conversational AI system designed to conduct rigorous clinical interviews, track mental health trajectories over time, and provide emotional support—all while ensuring 100% data privacy by running entirely on-device.
 
+Unlike general-purpose AIs that suffer from "Helpful Assistant Syndrome" (offering premature advice or toxic positivity), Serinity acts as a professional, empathetic listener. 
 
-### Demo Video
-[Watch the Demo Video](https://drive.google.com/file/d/1leVlpynxIDxYQBItYIxcctSZ6l0ykxlh/view?usp=sharing)
+## Features
 
-##  The Problem
-Mental health resources are scarce, expensive, and heavily stigmatized. While cloud-based LLM chatbots offer a potential solution, they introduce severe privacy risks. Users are rightfully terrified of sharing their deepest traumas, suicidal ideations, or relationship struggles with a cloud server that might train on their data or suffer a breach. 
-
-Furthermore, general-purpose AIs suffer from "Helpful Assistant Syndrome"—they offer premature advice and toxic positivity rather than acting as professional, empathetic listeners.
-
-##  The Solution
-Serinity solves this by operating as a **Local-First, Multi-Agent System**:
-- **100% Private**: Audio processing, Vector Database (RAG), and LLM inference happen entirely on your local hardware. No user data ever leaves the machine.
-- **Clinically Grounded**: Powered by a Retrieval-Augmented Generation (RAG) pipeline loaded with psychiatric literature (like *Sims' Symptoms in the Mind*), allowing the bot to conduct structured clinical interviews.
+- **100% Private (Local-First)**: Audio processing, Vector Database (RAG), and LLM inference happen entirely on your local hardware or your private cloud deployment. No user data is sent to public AI APIs.
+- **Clinically Grounded**: Powered by a Retrieval-Augmented Generation (RAG) pipeline loaded with psychiatric literature, allowing the bot to conduct structured clinical interviews.
 - **Agentic Memory**: Uses a background agent to continually update a structured "Clinical Profile" across 8 domains (Emotional Themes, Behavioral Patterns, Risk Assessment) to track patient trajectories over multiple sessions.
+- **Multi-Modal Support**: Asynchronous voice-to-text processing built-in.
 
 ---
 
-##  Setup Instructions
+## Installation
 
 ### Prerequisites
 1. **Python 3.10+**
-2. **Ollama**: Must be installed locally and running.
+2. **Ollama**: Must be installed locally and running (if running locally).
    ```bash
-   # Pull the required embeddings and chat model
    ollama pull nomic-embed-text:latest
    ollama pull qwen2.5:7b-instruct
    ```
-3. **FFmpeg**: Required for audio processing. Make sure it's added to your system PATH.
+3. **FFmpeg**: Required for audio processing.
 
-### Installation
+### Setup
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/serinity.git
-   cd serinity
+   git clone https://github.com/Amogh1221/Serinity.git
+   cd Serinity
    ```
 
 2. **Backend Setup (FastAPI):**
    ```bash
-   # Create a virtual environment
    python -m venv .venv
    
    # Activate it (Windows)
    .venv\Scripts\activate
+   # Or on Linux/Mac: source .venv/bin/activate
    
    # Install dependencies
-   pip install -r requirements.txt
+   pip install -r Requirements.txt
    ```
 
 3. **Environment Variables:**
-   Create a `.env` file in the root directory. You do *not* need an API key for the core local features, but ensure the following are set if testing the optional cloud fallbacks:
+   Create a `.env` file in the root directory using `.env.example` as a template.
    ```env
    # Ollama local inference
    OLLAMA_HOST=http://localhost:11434
@@ -60,7 +62,7 @@ Serinity solves this by operating as a **Local-First, Multi-Agent System**:
    LLM2_MODEL=qwen2.5:7b-instruct
    EMBEDDING_MODEL=nomic-embed-text
    
-   # HuggingFace model cache — store inside the project so everything is self-contained
+   # HuggingFace model cache 
    HF_HOME=./models
    
    # ChromaDB local vector store
@@ -73,38 +75,16 @@ Serinity solves this by operating as a **Local-First, Multi-Agent System**:
    # Debug logs directory
    LOG_DIR=./logs
    
-   # Working memory window (number of raw turns to keep in active context)
+   # Working memory window
    WORKING_MEMORY_TURNS=20
-
-   # Cloud Fallback Configs (if CLOUD_MODE=true)
-   CLOUD_MODE=false
-   GROQ_API_KEY=your_groq_key
-   PINECONE_API_KEY=your_pinecone_key
-   PINECONE_ENVIRONMENT=your_pinecone_env
-   TURSO_DATABASE_URL=your_turso_url
-   TURSO_AUTH_TOKEN=your_turso_token
-   BREVO_API_KEY=your_brevo_key
-   BETTERSTACK_SOURCE_TOKEN=your_betterstack_token
    ```
 
 ---
 
-##  Testing & Development
-Serinity includes a comprehensive test suite for both local logic and cloud integrations, using `pytest`.
+## Usage
 
-To run the full test suite (unit + integration tests):
-```bash
-uv run python -m pytest -v tests/
-```
-Ensure you have configured your cloud API keys in `.env` if you wish to run the cloud integration tests (`test_cloud_providers.py`).
+To start the application locally, run the FastAPI backend server:
 
----
-
-##  Run Commands
-
-To start the application, you only need to run the backend server, which also serves the frontend templates.
-
-**Terminal (Backend):**
 ```bash
 .venv\Scripts\activate
 uvicorn main:app --reload
@@ -113,33 +93,22 @@ uvicorn main:app --reload
 
 ---
 
-##  Sample Inputs and Expected Outputs
+## Testing & Development
 
-**User:** "I've been feeling really isolated lately. My exams are coming up and I have no friends to talk to."
+Serinity includes a comprehensive test suite for both local logic and cloud integrations, using `pytest`.
 
-**Expected Output (Serinity):**
-*The bot correctly suppresses the urge to give unsolicited advice, prioritizing Therapeutic Alliance.*
-> "It sounds really isolating to be studying so intensely without your friends around. Balancing that exam pressure while feeling lonely is incredibly tough. I'm here to listen. When did this feeling of being stuck first start?"
-
-**Behind the Scenes (Clinical Profile Update):**
-The background Profile Manager agent silently updates the user's local JSON profile:
-```json
-{
-  "emotional_themes": ["Intense feelings of isolation and loneliness", "Exam-related stress"],
-  "behavioral_patterns": ["Withdrawing due to study pressures"],
-  "risk_assessment": "No safety concerns identified. Patient is seeking emotional support for situational stress."
-}
+To run the full test suite (unit + integration tests) locally:
+```bash
+python -m pytest -v tests/
 ```
 
 ---
 
-## Screenshots
-![Conversation](icons/conversation.png)
-![Patient Profile](icons/profile.png)
-![Terminal](icons/terminal.png)
+## Documentation
 
-
-##  Documentation
 For a deeper dive into the system design, please see the following documents:
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System diagrams and data flow.
 - [TECHNICAL_REPORT.md](TECHNICAL_REPORT.md) - Specs, metrics, safety protocols, and attribution.
+
+## License
+MIT License
