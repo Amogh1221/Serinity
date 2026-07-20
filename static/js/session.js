@@ -127,8 +127,13 @@ export async function startActualSession(pId) {
     handleAssistantResponses(data.assistant_message);
   } catch (e) {
     console.error("Failed to start session:", e);
-    alert("Failed to start session. Please try again.");
-    location.reload();
+    ui.showAlert("Session Failed", e.message || "Failed to start session. Please try again.");
+    ui.switchScreen("dashboardScreen");
+    const startButton = document.getElementById("dashboardStartBtn");
+    if (startButton) {
+      startButton.textContent = "START CONSULTATION";
+      startButton.disabled = false;
+    }
   }
 }
 

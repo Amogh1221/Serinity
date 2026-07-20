@@ -92,6 +92,14 @@ export async function startSessionReq(patientId) {
     method: "POST",
     body: JSON.stringify({ patient_id: patientId })
   });
+  if (!res.ok) {
+    let errorDetail = `HTTP Error ${res.status}`;
+    try {
+      const data = await res.json();
+      errorDetail = data.detail || errorDetail;
+    } catch(e) {}
+    throw new Error(errorDetail);
+  }
   return res.json();
 }
 
