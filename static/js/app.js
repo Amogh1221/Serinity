@@ -711,6 +711,7 @@ function bindEvents() {
 }
 
 // Bootstrap application
+api.pingHealth().catch(() => console.log("Wakeup ping sent."));
 audio.loadVoices();
 bindEvents();
 window.onload = () => session.initializeSession();
