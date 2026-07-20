@@ -67,18 +67,6 @@ def test_pinecone_provider():
         provider.vectorstore.delete(ids=[test_id])
 
 
-@pytest.mark.skipif(not os.getenv("GMAIL_APP_PASSWORD"), reason="GMAIL_APP_PASSWORD not set")
-def test_gmail_email(monkeypatch):
-    """Tests the Gmail SMTP API by sending a single OTP email."""
-    # Force cloud mode just for this test block
-    monkeypatch.setenv("CLOUD_MODE", "true")
-    from services.email_service import send_otp_email
-    
-    # Sending to a safe dummy email to verify the API accepts the payload (Returns 201/200)
-    success = send_otp_email("test@example.com", "Integration Test", "123456")
-    assert success is True
-
-
 @pytest.mark.skipif(not os.getenv("BETTERSTACK_SOURCE_TOKEN"), reason="BETTERSTACK_SOURCE_TOKEN not set")
 def test_betterstack_logging():
     """Tests sending a very small log payload to BetterStack."""

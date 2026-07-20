@@ -140,8 +140,8 @@
           </div>
         </div>
 
-        <button id="signupGetOtpBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-4">
-          Get OTP
+        <button id="signupCompleteBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-4">
+          Create Account
         </button>
 
         <button id="backToLoginBtn1" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
@@ -151,37 +151,11 @@
 
       <!-- Forgot Password Form -->
       <div id="forgotPwdFormContainer" class="hidden space-y-4">
-        <p class="text-sm text-clay font-body mb-4">Enter your email address and we will send you a 6-digit verification code to reset your password.</p>
+        <p class="text-sm text-clay font-body mb-4">Enter your email address and a new password.</p>
         <div>
           <label class="block text-xs font-utility text-clay uppercase mb-1">Email Address</label>
           <input type="email" id="forgotPwdEmail" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss transition" placeholder="jane@example.com">
         </div>
-        <button id="requestOtpBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
-          Send Code
-        </button>
-        <button id="backToLoginBtn2" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
-          &larr; Back to Login
-        </button>
-      </div>
-
-      <!-- Reset Password Step 1: OTP Verification -->
-      <div id="otpStepContainer" class="hidden space-y-4">
-        <p class="text-sm text-clay font-body mb-4 text-center">We've sent a 6-digit code to your email.</p>
-        <div>
-          <label class="block text-xs font-utility text-clay uppercase mb-1">6-Digit Code</label>
-          <input type="text" id="resetOtpCode" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss text-center tracking-widest font-mono text-lg" placeholder="000000" maxlength="6" inputmode="numeric">
-        </div>
-        <button id="verifyOtpBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
-          Verify Code
-        </button>
-        <button id="backToForgotBtn" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
-          &larr; Back
-        </button>
-      </div>
-
-      <!-- Reset Password Step 2: New Password (no back button) -->
-      <div id="newPwdStepContainer" class="hidden space-y-4">
-        <p class="text-sm text-clay font-body mb-4 text-center">OTP verified. Enter your new password below.</p>
         <div>
           <label class="block text-xs font-utility text-clay uppercase mb-1">New Password</label>
           <input type="password" id="resetNewPassword" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss" placeholder="Min. 8 characters">
@@ -189,20 +163,8 @@
         <button id="submitResetBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
           Update Password
         </button>
-      </div>
-
-      <!-- Signup Step 2: OTP Verification -->
-      <div id="signupOtpStepContainer" class="hidden space-y-4">
-        <p class="text-sm text-clay font-body mb-4 text-center">We've sent a 6-digit code to your email.</p>
-        <div>
-          <label class="block text-xs font-utility text-clay uppercase mb-1">6-Digit Code *</label>
-          <input type="text" id="signupOtpCode" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss text-center tracking-widest font-mono text-lg" placeholder="000000" maxlength="6" inputmode="numeric">
-        </div>
-        <button id="signupCompleteBtn" class="w-full btn-primary py-3 font-utility uppercase tracking-widest text-sm mt-2">
-          Complete Signup
-        </button>
-        <button id="backToSignupBtn" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
-          &larr; Back to Signup
+        <button id="backToLoginBtn2" class="w-full bg-transparent text-clay hover:text-ink transition py-3 font-utility uppercase tracking-widest text-xs mt-2">
+          &larr; Back to Login
         </button>
       </div>
 
@@ -418,34 +380,14 @@
   <div id="deleteAccountConfirmModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
     <div class="panel p-8 max-w-sm w-full shadow-lg">
       <h2 class="text-xl font-display text-signal mb-2">Delete Account?</h2>
-      <p class="text-clay text-sm mb-6">Are you sure you want to completely delete your account? This action is irreversible and all data will be erased. An OTP will be sent to your email to verify.</p>
+      <p class="text-clay text-sm mb-6">Are you sure you want to completely delete your account? This action is irreversible and all data will be erased.</p>
       
       <div class="flex gap-4">
         <button id="deleteAccountCancelBtn" class="flex-1 bg-transparent border border-ink text-ink hover:bg-ink hover:text-paper transition py-2 font-utility uppercase tracking-widest text-sm">
           CANCEL
         </button>
-        <button id="deleteAccountSendOtpBtn" class="flex-1 bg-signal text-paper hover:bg-signal/80 transition py-2 font-utility uppercase tracking-widest text-sm">
-          SEND OTP
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Delete Account OTP Modal -->
-  <div id="deleteAccountOtpModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
-    <div class="panel p-8 max-w-sm w-full shadow-lg">
-      <div class="flex justify-between items-center mb-6">
-        <h2 class="text-xl font-display text-signal">Delete Account</h2>
-        <button id="closeDeleteOtpModalBtn" class="text-clay hover:text-ink transition">&times;</button>
-      </div>
-      <p class="text-clay text-sm mb-6">An OTP has been sent to your email. Enter it below to permanently delete your account and all data.</p>
-      <div class="space-y-4">
-        <div>
-          <label class="block text-xs font-utility text-clay uppercase mb-1">6-Digit Code</label>
-          <input type="text" id="deleteAccountOtpCode" class="w-full bg-paper border border-ink p-3 text-ink focus:outline-none focus:border-moss text-center tracking-widest font-mono text-lg" placeholder="000000" maxlength="6">
-        </div>
-        <button id="submitDeleteOtpBtn" class="w-full bg-signal text-paper hover:bg-signal/90 transition py-3 font-utility uppercase tracking-widest text-sm mt-2">
-          Verify & Delete
+        <button id="deleteAccountConfirmBtn" class="flex-1 bg-signal text-paper hover:bg-signal/80 transition py-2 font-utility uppercase tracking-widest text-sm">
+          DELETE
         </button>
       </div>
     </div>

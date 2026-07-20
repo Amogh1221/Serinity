@@ -3,24 +3,9 @@ import pytest
 from fastapi.testclient import TestClient
 from persistence.user_store import SQLiteUserStore
 
-def test_request_signup_otp(client: TestClient, user_store: SQLiteUserStore):
-    response = client.post(
-        "/api/auth/signup/request-otp",
-        json={"email": "test@example.com", "username": "testuser"}
-    )
-    assert response.status_code == 200
-    assert response.json() == {"message": "OTP has been sent to your email."}
-    
-    otp_record = user_store.get_otp("test@example.com")
-    assert otp_record is not None
-    assert len(otp_record["otp_code"]) == 6
+
 
 def test_signup(client: TestClient, user_store: SQLiteUserStore):
-    # Pre-populate OTP
-    otp_code = "123456"
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
-    user_store.store_otp("testsignup@example.com", otp_code, expires_at)
-    
     response = client.post(
         "/api/auth/signup",
         json={
@@ -28,7 +13,6 @@ def test_signup(client: TestClient, user_store: SQLiteUserStore):
             "username": "testsignup",
             "email": "testsignup@example.com",
             "password": "strongpassword123",
-            "otp_code": otp_code,
             "age": 30,
             "gender": "Male",
             "nationality": "US",
@@ -78,30 +62,10 @@ def test_forgot_password_flow(client: TestClient, user_store: SQLiteUserStore):
         password_hash=get_password_hash("oldpassword")
     )
     
-    # Request OTP
-    response = client.post(
-        "/api/auth/forgot-password",
-        json={"email": "forgot@example.com"}
-    )
-    assert response.status_code == 200
-    
-    otp_record = user_store.get_otp("forgot@example.com")
-    assert otp_record is not None
-    otp_code = otp_record["otp_code"]
-    
-    # Verify OTP only
-    response = client.post(
-        "/api/auth/verify-otp",
-        json={"email": "forgot@example.com", "otp_code": otp_code}
-    )
-    assert response.status_code == 200
-    
-    # Re-store OTP since verify-otp might delete or we might need it for reset
-    # Wait, looking at verify_otp_only, it doesn't delete it.
-    # Let's reset password
+    # Let's reset password directly
     response = client.post(
         "/api/auth/reset-password",
-        json={"email": "forgot@example.com", "otp_code": otp_code, "new_password": "newpassword123"}
+        json={"email": "forgot@example.com", "new_password": "newpassword123"}
     )
     assert response.status_code == 200
     
@@ -128,17 +92,9 @@ def test_delete_account_flow(client: TestClient, user_store: SQLiteUserStore):
     token = login_resp.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     
-    # Request delete OTP
-    resp1 = client.post("/api/auth/delete-account/request-otp", headers=headers)
-    assert resp1.status_code == 200
-    
-    otp_record = user_store.get_otp("delete@example.com")
-    otp_code = otp_record["otp_code"]
-    
     # Verify delete
     resp2 = client.post(
-        "/api/auth/delete-account/verify",
-        json={"otp_code": otp_code},
+        "/api/auth/delete-account",
         headers=headers
     )
     assert resp2.status_code == 200

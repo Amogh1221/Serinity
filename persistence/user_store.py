@@ -64,28 +64,3 @@ class SQLiteUserStore(SQLiteBaseStore):
         with self._get_conn() as conn:
             conn.execute("DELETE FROM users WHERE id=?", (user_id,))
 
-    # OTP Token Management
-    def store_otp(self, email: str, otp_code: str, expires_at: datetime) -> None:
-        with self._get_conn() as conn:
-            conn.execute(
-                """
-                INSERT INTO otp_tokens(email, otp_code, expires_at)
-                VALUES(?,?,?)
-                ON CONFLICT(email) DO UPDATE SET
-                    otp_code=excluded.otp_code,
-                    expires_at=excluded.expires_at
-                """,
-                (email, otp_code, expires_at.isoformat())
-            )
-
-    def get_otp(self, email: str) -> Optional[dict]:
-        with self._get_conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM otp_tokens WHERE email=?",
-                (email,)
-            ).fetchone()
-        return dict(row) if row else None
-
-    def delete_otp(self, email: str) -> None:
-        with self._get_conn() as conn:
-            conn.execute("DELETE FROM otp_tokens WHERE email=?", (email,))

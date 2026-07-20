@@ -59,11 +59,6 @@ class SQLiteBaseStore:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
 
-                CREATE TABLE IF NOT EXISTS otp_tokens (
-                    email TEXT PRIMARY KEY,
-                    otp_code TEXT NOT NULL,
-                    expires_at TIMESTAMP NOT NULL
-                );
 
                 CREATE TABLE IF NOT EXISTS patients (
                     patient_id      TEXT PRIMARY KEY,

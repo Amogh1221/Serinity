@@ -183,9 +183,7 @@ function bindEvents() {
     }
   });
 
-  let _signupPayload = null;
-
-  document.getElementById("signupGetOtpBtn")?.addEventListener("click", async () => {
+  document.getElementById("signupCompleteBtn")?.addEventListener("click", async () => {
     const payload = {
       name: document.getElementById("signupName").value.trim(),
       username: document.getElementById("signupUsername").value.trim(),
@@ -212,63 +210,11 @@ function bindEvents() {
     }
 
     try {
-      document.getElementById("signupGetOtpBtn").textContent = "Sending OTP...";
-      document.getElementById("signupGetOtpBtn").disabled = true;
-      
-      await auth.requestSignupOtp(payload.email, payload.username);
-      
-      _signupPayload = payload;
-      
-      // Clear OTP code and switch to signup OTP panel
-      const signupOtpCodeField = document.getElementById("signupOtpCode");
-      if (signupOtpCodeField) {
-        signupOtpCodeField.value = "";
-      }
-      showAuthPanel("signupOtpStepContainer");
-      
-    } catch (e) {
-      ui.showAlert("Signup Failed", e.message);
-    } finally {
-      document.getElementById("signupGetOtpBtn").textContent = "Get OTP";
-      document.getElementById("signupGetOtpBtn").disabled = false;
-    }
-  });
-
-  document.getElementById("signupCompleteBtn")?.addEventListener("click", async () => {
-    if (!_signupPayload) {
-      return ui.showAlert("Signup Error", "Missing signup details. Please refresh and try again.");
-    }
-    
-    const signupOtpCodeField = document.getElementById("signupOtpCode");
-    if (!signupOtpCodeField) {
-      return ui.showAlert("Signup Error", "OTP code field not found. Please refresh and try again.");
-    }
-    
-    const otpCode = signupOtpCodeField.value.trim();
-    if (otpCode.length !== 6) {
-      return ui.showAlert("Signup Error", "Please enter the 6-digit OTP code.");
-    }
-    
-    try {
-      const completeBtn = document.getElementById("signupCompleteBtn");
-      if (completeBtn) {
-        completeBtn.textContent = "Creating Account...";
-        completeBtn.disabled = true;
-      }
-      
-      const payload = {
-        ..._signupPayload,
-        otp_code: otpCode
-      };
+      document.getElementById("signupCompleteBtn").textContent = "Creating Account...";
+      document.getElementById("signupCompleteBtn").disabled = true;
       
       await auth.signup(payload);
       
-      _signupPayload = null;
-      if (signupOtpCodeField) {
-        signupOtpCodeField.value = "";
-      }
-      
-      // Account created successfully, go back to login
       ui.showAlert("Success", "Account created successfully!");
       showAuthPanel("loginFormContainer");
       
@@ -276,66 +222,23 @@ function bindEvents() {
     } catch (e) {
       ui.showAlert("Signup Failed", e.message);
     } finally {
-      const completeBtn = document.getElementById("signupCompleteBtn");
-      if (completeBtn) {
-        completeBtn.textContent = "Complete Signup";
-        completeBtn.disabled = false;
-      }
-    }
-  });
-
-  document.getElementById("requestOtpBtn")?.addEventListener("click", async () => {
-    const email = document.getElementById("forgotPwdEmail").value.trim();
-    if (!email) return ui.showAlert("Reset Password", "Please enter your email.");
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return ui.showAlert("Reset Password", "Please enter a valid email address.");
-    try {
-      document.getElementById("requestOtpBtn").textContent = "Sending...";
-      document.getElementById("requestOtpBtn").disabled = true;
-      await auth.forgotPassword(email);
-      document.getElementById("resetOtpCode").value = "";
-      showAuthPanel("otpStepContainer");
-    } catch(e) {
-      ui.showAlert("Reset Password", e.message);
-    } finally {
-      document.getElementById("requestOtpBtn").textContent = "Send Code";
-      document.getElementById("requestOtpBtn").disabled = false;
-    }
-  });
-
-  document.getElementById("verifyOtpBtn")?.addEventListener("click", async () => {
-    const email = document.getElementById("forgotPwdEmail").value.trim();
-    const otp = document.getElementById("resetOtpCode").value.trim();
-    if (otp.length !== 6) return ui.showAlert("Reset Password", "Please enter the 6-digit code.");
-    try {
-      document.getElementById("verifyOtpBtn").textContent = "Verifying...";
-      document.getElementById("verifyOtpBtn").disabled = true;
-      await auth.verifyOtp(email, otp);
-      _otpVerifiedEmail = email;
-      document.getElementById("resetNewPassword").value = "";
-      showAuthPanel("newPwdStepContainer");
-    } catch(e) {
-      ui.showAlert("Verification Failed", e.message);
-    } finally {
-      document.getElementById("verifyOtpBtn").textContent = "Verify Code";
-      document.getElementById("verifyOtpBtn").disabled = false;
+      document.getElementById("signupCompleteBtn").textContent = "Create Account";
+      document.getElementById("signupCompleteBtn").disabled = false;
     }
   });
 
   document.getElementById("submitResetBtn")?.addEventListener("click", async () => {
-    // If _otpVerifiedEmail is null, this means a refresh happened — redirect to login
-    if (!_otpVerifiedEmail) {
-      showAuthPanel("loginFormContainer");
-      return;
-    }
+    const email = document.getElementById("forgotPwdEmail").value.trim();
+    if (!email) return ui.showAlert("Reset Password", "Please enter your email.");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return ui.showAlert("Reset Password", "Please enter a valid email address.");
+
     const newPass = document.getElementById("resetNewPassword").value;
     if (!newPass || newPass.length < 8) return ui.showAlert("Reset Password", "New password must be at least 8 characters long.");
     try {
       document.getElementById("submitResetBtn").textContent = "Updating...";
       document.getElementById("submitResetBtn").disabled = true;
-      const otp = document.getElementById("resetOtpCode").value.trim();
-      await auth.resetPassword(_otpVerifiedEmail, otp, newPass);
-      _otpVerifiedEmail = null;
+      await auth.resetPassword(email, newPass);
       ui.showAlert("Success", "Password reset successfully! Please log in.");
       showAuthPanel("loginFormContainer");
     } catch (e) {
@@ -395,57 +298,25 @@ function bindEvents() {
     };
   }
 
-  const deleteAccountSendOtpBtn = document.getElementById("deleteAccountSendOtpBtn");
-  if (deleteAccountSendOtpBtn) {
-    deleteAccountSendOtpBtn.onclick = async () => {
+  const deleteAccountConfirmBtn = document.getElementById("deleteAccountConfirmBtn");
+  if (deleteAccountConfirmBtn) {
+    deleteAccountConfirmBtn.onclick = async () => {
       try {
-        deleteAccountSendOtpBtn.textContent = "Sending OTP...";
-        deleteAccountSendOtpBtn.disabled = true;
+        deleteAccountConfirmBtn.textContent = "Deleting...";
+        deleteAccountConfirmBtn.disabled = true;
         
-        await auth.requestDeleteAccountOtp();
+        await auth.deleteAccount();
         
-        // Close confirmation modal and show OTP modal
         document.getElementById("deleteAccountConfirmModal").style.display = "none";
-        document.getElementById("deleteAccountOtpCode").value = "";
-        document.getElementById("deleteAccountOtpModal").style.display = "flex";
-        
-      } catch (e) {
-        console.error("Error requesting OTP:", e);
-        ui.showAlert("Error", e.message);
-      } finally {
-        deleteAccountSendOtpBtn.textContent = "SEND OTP";
-        deleteAccountSendOtpBtn.disabled = false;
-      }
-    };
-  }
-
-  const closeDeleteOtpModalBtn = document.getElementById("closeDeleteOtpModalBtn");
-  if (closeDeleteOtpModalBtn) {
-    closeDeleteOtpModalBtn.onclick = () => {
-      document.getElementById("deleteAccountOtpModal").style.display = "none";
-    };
-  }
-
-  const submitDeleteOtpBtn = document.getElementById("submitDeleteOtpBtn");
-  if (submitDeleteOtpBtn) {
-    submitDeleteOtpBtn.onclick = async () => {
-      const code = document.getElementById("deleteAccountOtpCode").value.trim();
-      if (code.length !== 6) return ui.showAlert("Error", "Please enter a valid 6-digit code.");
-      try {
-        submitDeleteOtpBtn.textContent = "Verifying...";
-        submitDeleteOtpBtn.disabled = true;
-        
-        await auth.verifyDeleteAccount(code);
-        
-        document.getElementById("deleteAccountOtpModal").style.display = "none";
         auth.logout();
         ui.switchScreen("authScreen");
         
       } catch (e) {
+        console.error("Error deleting account:", e);
         ui.showAlert("Error", e.message);
       } finally {
-        submitDeleteOtpBtn.textContent = "Verify & Delete";
-        submitDeleteOtpBtn.disabled = false;
+        deleteAccountConfirmBtn.textContent = "DELETE";
+        deleteAccountConfirmBtn.disabled = false;
       }
     };
   }
