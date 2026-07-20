@@ -19,4 +19,4 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           pip install -U "huggingface_hub[cli]"
-          hf upload Amogh1221/serinity . . --repo-type space --exclude "icons/*" ".git/*" ".github/*" "tests/*" "scratch/*"
+          hf upload Amogh1221/serinity . . --repo-type space --exclude "icons/*" --exclude ".git/*" --exclude ".github/*" --exclude "tests/*" --exclude "scratch/*"
