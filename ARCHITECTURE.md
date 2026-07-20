@@ -4,11 +4,11 @@ Serinity is designed as a modular multi-agent system with a **Dual-Environment A
 
 ## System Diagram
 
-![Architecture](architecture.png)
+![Architecture](icons/architecture.png)
 
-## Agentic Workflow Deep Dive
+## Workflow Deep Dive
 
-![Workflow](workflow.png)
+![Workflow](icons/workflow.png)
 
 Serinity replaces the traditional single-prompt chatbot approach with a **Multi-Agent Pipeline** to ensure clinical rigor:
 
