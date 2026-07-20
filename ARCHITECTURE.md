@@ -4,80 +4,11 @@ Serinity is designed as a modular multi-agent system with a **Dual-Environment A
 
 ## System Diagram
 
-```mermaid
-graph TD
-    %% Frontend Components
-    subgraph Frontend ["Client"]
-        A["User Interface"]
-        Mic["Microphone Input"]
-    end
-
-    %% Backend API Layer
-    subgraph Backend ["FastAPI Backend"]
-        Router["API Routers"]
-        AudioProc["SenseVoice STT"]
-        CO["Conversation Orchestrator"]
-        Logger["Logging Module"]
-    end
-
-    %% Abstraction Layer
-    subgraph Interfaces ["Provider Abstractions"]
-        LLM_Interface["LLM Provider"]
-        DB_Interface["Memory Store"]
-        Vec_Interface["Vector Store"]
-        Email_Interface["Email / OTP Service"]
-    end
-
-    %% Local Providers (CLOUD_MODE = false)
-    subgraph Local ["Local Resources"]
-        Ollama["Ollama (Qwen/Phi)"]
-        SQLite["SQLite (Local DB)"]
-        Chroma["ChromaDB"]
-        LocalPrint["Terminal Print OTP"]
-        FileLog["Local File Logs"]
-    end
-
-    %% Cloud Providers (CLOUD_MODE = true)
-    subgraph Cloud ["Cloud Integrations"]
-        Groq["Groq API (Llama)"]
-        Turso["Turso DB (libSQL)"]
-        Pinecone["Pinecone Vector DB"]
-        Brevo["Brevo Email API"]
-        BetterStack["BetterStack (Logtail)"]
-    end
-
-    %% Data Flow
-    A -->|Chat / Auth| Router
-    Mic -->|Audio Blob| AudioProc
-    AudioProc -->|Transcribed Text| Router
-    
-    Router --> CO
-    Router --> Logger
-    
-    %% Provider Routing
-    CO --> LLM_Interface
-    CO --> DB_Interface
-    CO --> Vec_Interface
-    CO --> Email_Interface
-
-    %% Conditional Routing
-    LLM_Interface -.->|Cloud Mode| Groq
-    LLM_Interface -.->|Local Mode| Ollama
-
-    DB_Interface -.->|Cloud Mode| Turso
-    DB_Interface -.->|Local Mode| SQLite
-
-    Vec_Interface -.->|Cloud Mode| Pinecone
-    Vec_Interface -.->|Local Mode| Chroma
-
-    Email_Interface -.->|Cloud Mode| Brevo
-    Email_Interface -.->|Local Mode| LocalPrint
-
-    Logger -.->|Cloud Mode| BetterStack
-    Logger -.->|Local Mode| FileLog
-```
+![Architecture](architecture.png)
 
 ## Agentic Workflow Deep Dive
+
+![Workflow](workflow.png)
 
 Serinity replaces the traditional single-prompt chatbot approach with a **Multi-Agent Pipeline** to ensure clinical rigor:
 
