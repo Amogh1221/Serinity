@@ -67,9 +67,9 @@ def test_pinecone_provider():
         provider.vectorstore.delete(ids=[test_id])
 
 
-@pytest.mark.skipif(not os.getenv("BREVO_API_KEY"), reason="BREVO_API_KEY not set")
-def test_brevo_email(monkeypatch):
-    """Tests the Brevo API by sending a single OTP email."""
+@pytest.mark.skipif(not os.getenv("GMAIL_APP_PASSWORD"), reason="GMAIL_APP_PASSWORD not set")
+def test_gmail_email(monkeypatch):
+    """Tests the Gmail SMTP API by sending a single OTP email."""
     # Force cloud mode just for this test block
     monkeypatch.setenv("CLOUD_MODE", "true")
     from services.email_service import send_otp_email

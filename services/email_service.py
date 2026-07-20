@@ -1,5 +1,7 @@
 import os
-import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from core.logger import serinity_logger as logger
 
@@ -26,40 +28,33 @@ def send_otp_email(to_email: str, subject: str, otp_code: str, body_text: Option
         logger.info(f"Local email simulated for {to_email} (Subject: {subject})")
         return True
 
-    # Cloud Mode: Send via Brevo
-    brevo_api_key = os.getenv("BREVO_API_KEY")
-    if not brevo_api_key:
-        logger.error("BREVO_API_KEY is not set in environment variables.")
+    # Cloud Mode: Send via Gmail SMTP
+    gmail_user = os.getenv("BREVO_SENDER_EMAIL")  # using the same variable name you already have!
+    gmail_app_password = os.getenv("GMAIL_APP_PASSWORD")
+
+    if not gmail_user or not gmail_app_password:
+        logger.error("BREVO_SENDER_EMAIL or GMAIL_APP_PASSWORD is not set in environment variables.")
         return False
 
-    url = "https://api.brevo.com/v3/smtp/email"
-    headers = {
-        "accept": "application/json",
-        "api-key": brevo_api_key,
-        "content-type": "application/json"
-    }
-    
-    payload = {
-        "sender": {
-            "name": "Serinity AI",
-            "email": os.getenv("BREVO_SENDER_EMAIL")
-        },
-        "to": [
-            {
-                "email": to_email
-            }
-        ],
-        "subject": subject,
-        "htmlContent": f"<html><body><p>{body_text}</p></body></html>"
-    }
+    msg = MIMEMultipart()
+    msg['From'] = f"Serinity AI <{gmail_user}>"
+    msg['To'] = to_email
+    msg['Subject'] = subject
+
+    msg.attach(MIMEText(f"<html><body><p>{body_text}</p></body></html>", 'html'))
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        response.raise_for_status()
-        logger.info(f"Email sent successfully via Brevo to {to_email}")
+        # Connect to Gmail's SMTP server
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        # Login with App Password
+        server.login(gmail_user, gmail_app_password)
+        # Send email
+        server.send_message(msg)
+        server.quit()
+        
+        logger.info(f"Email sent successfully via Gmail SMTP to {to_email}")
         return True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send email via Brevo: {str(e)}")
-        if hasattr(e, 'response') and e.response is not None:
-            logger.error(f"Brevo API Response: {e.response.text}")
+    except Exception as e:
+        logger.error(f"Failed to send email via Gmail SMTP: {str(e)}")
         return False
