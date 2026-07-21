@@ -172,7 +172,7 @@ def chat_text(
     except Exception as e:
         error_str = str(e).lower()
         error_type = type(e).__name__.lower()
-        if "rate limit" in error_str or "ratelimit" in error_str or "429" in error_str or "ratelimit" in error_type:
+        if any(k in error_str for k in ("rate limit", "ratelimit", "429", "402", "tokens exhausted", "quota")) or "ratelimit" in error_type:
             raise HTTPException(status_code=429, detail="Tokens Exhausted")
         if "connection error" in error_str or "all providers failed" in error_str or "unavailable" in error_str:
             raise HTTPException(status_code=503, detail="LLMs are currently unavailable. Please try again later.")
