@@ -3,31 +3,40 @@ fastapi
 uvicorn
 python-multipart
 jinja2
-
-# Configuration & Security
-pydantic
-pydantic-settings
 python-dotenv
+httpx
+
+# Security & Auth
+pydantic
+pydantic[email]
 passlib[bcrypt]
 python-jose[cryptography]
 
-# LLMs & Vector Store
+# LLMs & NLP
 groq
 openai
+ollama
+transformers
+datasets
+tqdm
+
+# Vector DB & Retrieval
 chromadb
+pinecone
 langchain
 langchain-chroma
+langchain-pinecone
+langchain-community
 langchain-openai
+langchain-ollama
 
-# Audio Processing & Transcription
-librosa
-soundfile
-torchaudio
-transformers
+# Audio Processing (STT)
 funasr
+torchaudio
+soundfile
+librosa
 
 # Testing
 pytest
 pytest-asyncio
 pytest-mock
-httpx
