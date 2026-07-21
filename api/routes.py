@@ -224,11 +224,17 @@ def get_session_messages(
     messages = patient_service.get_session_messages(session_id)
     return {"messages": messages}
 
+_BLOCKED_PATH_FRAGMENTS = {
+    ".streamlit", ".env", "secrets.toml", "config.toml", ".git", "wp-admin", ".well-known"
+}
+
 @router.get("/{full_path:path}", response_class=HTMLResponse)
 def catch_all(request: Request, full_path: str):
     """
     Catch-all route to support History API (clean URLs) in the frontend SPA.
-    If the user navigates directly to /profiles or /dashboard, serve index.html
-    so the frontend JS can handle the routing.
+    Returns 404 for known config/secret paths probed by bots (e.g. .streamlit/secrets.toml).
+    Otherwise serves index.html so the frontend JS handles SPA routing.
     """
+    if any(fragment in full_path for fragment in _BLOCKED_PATH_FRAGMENTS):
+        return Response(status_code=404)
     return templates.TemplateResponse(request, "index.html")

@@ -46,20 +46,27 @@ class OllamaLLMProvider:
                 }
             ]
         
-    def psychiatrist_response(self, context: list, patient_info: dict = None) -> LLM1Output:
+    def psychiatrist_response(self, context: list, patient_info: dict = None, medium_term_memory: str | None = None) -> LLM1Output:
         try:
             sys_prompt = LLM1_SYSTEM_PROMPT
+            stable_parts = []
             if patient_info:
-                demographics = (
+                stable_parts.append(
                     f"PATIENT DEMOGRAPHICS:\n"
                     f"- Name: {patient_info.get('name', 'Unknown')}\n"
                     f"- Age: {patient_info.get('age', 'Unknown')}\n"
                     f"- Gender: {patient_info.get('gender', 'Unknown')}\n"
                     f"- Nationality: {patient_info.get('nationality', 'Unknown')}\n"
-                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}\n\n"
+                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}"
                 )
-                sys_prompt = demographics + sys_prompt
-                
+            if medium_term_memory:
+                stable_parts.append(
+                    f"PATIENT MEDIUM-TERM MEMORY (prior sessions & patterns — do not quote verbatim):\n"
+                    f"{medium_term_memory}"
+                )
+            if stable_parts:
+                sys_prompt = "\n\n".join(stable_parts) + "\n\n" + sys_prompt
+
             messages = [{"role": "system", "content": sys_prompt}]
             for m in context:
                 messages.append({"role": m["role"], "content": m["content"]})
@@ -82,9 +89,12 @@ class OllamaLLMProvider:
                 clinical_summary=None
             )
 
-    def internal_reasoning(self, context: list) -> LLM2Output:
+    def internal_reasoning(self, context: list, stable_prefix: str | None = None) -> LLM2Output:
         try:
             messages = [{"role": "system", "content": LLM2_SYSTEM_PROMPT}]
+            # For Ollama there is no caching concept; merge stable_prefix as a user message
+            if stable_prefix:
+                messages.append({"role": "user", "content": stable_prefix})
             for m in context:
                 messages.append({"role": m["role"], "content": m["content"]})
 

@@ -62,11 +62,11 @@ class LLMProvider(Protocol):
         """Generate the system/user prompt context for starting a session."""
         ...
 
-    def psychiatrist_response(self, context: list, patient_info: dict = None) -> LLM1Output:
+    def psychiatrist_response(self, context: list, patient_info: dict = None, medium_term_memory: str | None = None) -> LLM1Output:
         """Generate a conversational response mimicking a psychiatrist (LLM1 fast path)."""
         ...
 
-    def internal_reasoning(self, context: list) -> LLM2Output:
+    def internal_reasoning(self, context: list, stable_prefix: str | None = None) -> LLM2Output:
         """Perform a deep psychological analysis of the conversation history (LLM2 slow path)."""
         ...
         

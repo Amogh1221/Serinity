@@ -49,7 +49,6 @@ class SenseVoiceSTTProvider:
             self._sense_voice = AutoModel(
                 model="iic/SenseVoiceSmall",
                 trust_remote_code=True,
-                remote_code="./model.py",
                 vad_model="fsmn-vad",
                 vad_kwargs={"max_single_segment_time": 30000},
                 device="cpu",

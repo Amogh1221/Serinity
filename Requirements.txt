@@ -15,6 +15,7 @@ python-jose[cryptography]
 # LLMs & NLP
 groq
 openai
+huggingface-hub>=0.24.0
 ollama
 transformers
 datasets

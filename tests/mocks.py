@@ -5,7 +5,9 @@ class MockLLMProvider:
     def generate_opening_context(self, profile_recap: Optional[str]) -> list:
         return [{"role": "system", "content": "Mocked opening context"}]
 
-    def psychiatrist_response(self, context: list, patient_info: dict = None) -> LLM1Output:
+    def psychiatrist_response(
+        self, context: list, patient_info: dict = None, medium_term_memory: str | None = None
+    ) -> LLM1Output:
         return LLM1Output(
             assistant_message="Mocked response from LLM1",
             intent="CONTINUE",
@@ -14,7 +16,9 @@ class MockLLMProvider:
             search_query=None
         )
 
-    def internal_reasoning(self, context: list) -> LLM2Output:
+    def internal_reasoning(
+        self, context: list, stable_prefix: str | None = None
+    ) -> LLM2Output:
         return LLM2Output(
             assistant_message="Mocked response from LLM2",
             emotional_themes=["theme1"],

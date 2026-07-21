@@ -61,10 +61,15 @@ class TestGroqLLMProvider:
         result = provider.psychiatrist_response(context=[], patient_info=patient_info)
 
         assert result.intent == "CONTINUE"
-        # Verify demographics were included in the call
+        # After caching refactor:
+        #   messages[0] = cached LLM1_SYSTEM_PROMPT  (content is a list with cache_control)
+        #   messages[1] = cached stable context block (demographics + MTM, also a list)
         call_kwargs = mock_client.chat.completions.create.call_args
-        system_msg = call_kwargs[1]["messages"][0]["content"]
-        assert "Jane" in system_msg
+        messages = call_kwargs[1]["messages"]
+        # Demographics are in the second message's text block
+        stable_text = messages[1]["content"][0]["text"]
+        assert "Jane" in stable_text
+
 
     def test_psychiatrist_query_response(self):
         """QUERY path returns a plain string from the LLM."""

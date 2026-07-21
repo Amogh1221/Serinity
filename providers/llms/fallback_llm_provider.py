@@ -1,27 +1,51 @@
 from core.ports import LLM1Output, LLM2Output, LLM3Output
 
+
+def _is_rate_limit(exc: Exception) -> bool:
+    """Return True if the exception looks like a quota / rate-limit error."""
+    msg = str(exc).lower()
+    return any(k in msg for k in (
+        "429", "rate limit", "ratelimit", "too many requests",
+        "quota", "exceeded", "tokens exhausted", "credits"
+    ))
+
+
 class FallbackLLMProvider:
     """
     Composite LLM Provider that loops through a list of other providers.
     If a provider throws an exception (e.g. rate limit / 429), it tries the next.
-    Returns safe fallback strings if all providers fail.
+
+    For LLM1 and LLM2 calls:
+      - If all providers fail with a rate-limit/quota error, the exception is
+        re-raised so the route can return HTTP 429 and the frontend shows a popup.
+      - If all providers fail for any other reason, a safe fallback string is returned.
+
+    For non-conversational calls (query, LLM3, summarize), the fallback string is
+    always returned to avoid breaking secondary features.
     """
     def __init__(self, providers: list):
         self.providers = providers
 
     def generate_opening_context(self, profile_recap: str | None) -> list:
-        # This doesn't call an LLM directly, so we just use the first provider's logic
         return self.providers[0].generate_opening_context(profile_recap)
 
-    def psychiatrist_response(self, context: list, patient_info: dict = None) -> LLM1Output:
+    def psychiatrist_response(
+        self, context: list, patient_info: dict = None, medium_term_memory: str | None = None
+    ) -> LLM1Output:
+        last_error = None
         for provider in self.providers:
             try:
-                return provider.psychiatrist_response(context, patient_info)
+                return provider.psychiatrist_response(context, patient_info, medium_term_memory)
             except Exception as e:
+                last_error = e
                 print(f"[FallbackRouter] Provider {type(provider).__name__} failed for LLM1: {e}")
                 continue
-        
-        # All failed
+
+        # Surface rate-limit errors so the frontend can show a popup
+        if last_error and _is_rate_limit(last_error):
+            print("[FallbackRouter] Rate limit detected — re-raising for LLM1.")
+            raise RuntimeError(f"Tokens Exhausted: {last_error}") from last_error
+
         print("[FallbackRouter] ALL providers failed for LLM1!")
         return LLM1Output(
             assistant_message="I'm here, and I'm listening. Please take your time. && Would you like to tell me more about what's on your mind?",
@@ -30,15 +54,23 @@ class FallbackLLMProvider:
             clinical_summary=None
         )
 
-    def internal_reasoning(self, context: list) -> LLM2Output:
+    def internal_reasoning(
+        self, context: list, stable_prefix: str | None = None
+    ) -> LLM2Output:
+        last_error = None
         for provider in self.providers:
             try:
-                return provider.internal_reasoning(context)
+                return provider.internal_reasoning(context, stable_prefix)
             except Exception as e:
+                last_error = e
                 print(f"[FallbackRouter] Provider {type(provider).__name__} failed for LLM2: {e}")
                 continue
 
-        # All failed
+        # Surface rate-limit errors so the orchestrator can propagate them
+        if last_error and _is_rate_limit(last_error):
+            print("[FallbackRouter] Rate limit detected — re-raising for LLM2.")
+            raise RuntimeError(f"Tokens Exhausted: {last_error}") from last_error
+
         print("[FallbackRouter] ALL providers failed for LLM2!")
         return LLM2Output(
             assistant_message="I'm here, taking everything in. Please go on.",
@@ -62,7 +94,9 @@ class FallbackLLMProvider:
 
         return "I hear you, and we will find a way through this together. Let's keep exploring what might help."
 
-    def generate_end_of_session_profile(self, old_profile: dict, session_history: list, patient_info: dict = None) -> LLM3Output:
+    def generate_end_of_session_profile(
+        self, old_profile: dict, session_history: list, patient_info: dict = None
+    ) -> LLM3Output:
         for provider in self.providers:
             try:
                 return provider.generate_end_of_session_profile(old_profile, session_history, patient_info)

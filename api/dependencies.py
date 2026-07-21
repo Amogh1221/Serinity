@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from providers.llms.groq_llm_provider import GroqLLMProvider
 from providers.llms.ollama_llm_provider import OllamaLLMProvider
+from providers.llms.huggingface_llm_provider import HuggingFaceLLMProvider
 from providers.llms.fallback_llm_provider import FallbackLLMProvider
 from providers.speech_to_text_provider import SenseVoiceSTTProvider
 from providers.chroma_provider import ChromaVectorStore
@@ -49,6 +50,11 @@ PINECONE_INDEX_NAME  = os.getenv("PINECONE_INDEX_NAME", "serinity-knowledge")
 MEMORY_DB_PATH       = os.getenv("MEMORY_DB_PATH", "./data/serinity.db")
 WORKING_MEMORY_TURNS = int(os.getenv("WORKING_MEMORY_TURNS", "20"))
 CLOUD_MODE           = os.getenv("CLOUD_MODE", "false").lower() == "true"
+# LLM_PROVIDER selects the cloud backend when CLOUD_MODE=true.
+# Options: "groq" (default) | "hf" (HuggingFace Serverless Inference API)
+LLM_PROVIDER         = os.getenv("LLM_PROVIDER", "groq").lower()
+HF_LLM1_MODEL        = os.getenv("HF_LLM1_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
+HF_LLM2_MODEL        = os.getenv("HF_LLM2_MODEL", "meta-llama/Llama-3.3-70B-Instruct")
 
 _hf_home_raw = os.getenv("HF_HOME", "./models")
 if not os.path.isabs(_hf_home_raw):
@@ -57,11 +63,16 @@ os.environ["HF_HOME"] = _hf_home_raw
 os.makedirs(_hf_home_raw, exist_ok=True)
 
 # Instantiate singleton infrastructure
-groq_provider = GroqLLMProvider(model1=GROQ_LLM1_MODEL, model2=GROQ_LLM2_MODEL)
 ollama_provider = OllamaLLMProvider(host=OLLAMA_HOST, model1=OLLAMA_LLM1_MODEL, model2=OLLAMA_LLM2_MODEL)
 
 if CLOUD_MODE:
-    llm_provider = FallbackLLMProvider(providers=[groq_provider])
+    if LLM_PROVIDER == "hf":
+        _cloud_provider = HuggingFaceLLMProvider(model1=HF_LLM1_MODEL, model2=HF_LLM2_MODEL)
+        print(f"[STARTUP] LLM backend: HuggingFace ({HF_LLM1_MODEL} / {HF_LLM2_MODEL})")
+    else:
+        _cloud_provider = GroqLLMProvider(model1=GROQ_LLM1_MODEL, model2=GROQ_LLM2_MODEL)
+        print(f"[STARTUP] LLM backend: Groq ({GROQ_LLM1_MODEL} / {GROQ_LLM2_MODEL})")
+    llm_provider = FallbackLLMProvider(providers=[_cloud_provider])
     vector_store = PineconeVectorStore(
         host=OLLAMA_HOST,
         embedding_model=EMBEDDING_MODEL,

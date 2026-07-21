@@ -29,3 +29,6 @@ logs/
 # Artifacts & Output
 brain/
 *.md
+
+# Local HF/ModelScope model cache (downloaded at runtime, not needed in image)
+models/

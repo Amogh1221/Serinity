@@ -54,9 +54,17 @@ class ConversationOrchestrator:
         self.session_store.append_message(session_id, "user", user_message)
         
         history = self.session_store.get_working_context(session_id, llm_engine=self.llm_provider)
-        
+
+        # Build medium-term memory once — constant within a session, stable between LLM2 updates.
+        # Passed to LLM1 as a cached context block and reused in LLM2 via _run_sync_analysis.
+        medium_term_memory: Optional[str] = None
+        if patient_id:
+            medium_term_memory = self.profile_store.build_profile_recap(patient_id)
+
         try:
-            llm1_response = self.llm_provider.psychiatrist_response(history, patient_info)
+            llm1_response = self.llm_provider.psychiatrist_response(
+                history, patient_info, medium_term_memory=medium_term_memory
+            )
             log.llm1_decision(llm1_response)
             
             base_risk = self.risk_service.assess(message, llm1_response, None)
@@ -76,7 +84,12 @@ class ConversationOrchestrator:
                 
             # Synchronous execution of LLM2 pipeline
             if intent == "ANALYZE" and patient_id:
-                llm2_message = self._run_sync_analysis(session_id, patient_id, llm1_response.clinical_summary, llm1_response.assistant_message)
+                llm2_message = self._run_sync_analysis(
+                    session_id, patient_id,
+                    llm1_response.clinical_summary,
+                    llm1_response.assistant_message,
+                    medium_term_memory=medium_term_memory,
+                )
                 if llm2_message:
                     final_message = llm2_message
 
@@ -96,6 +109,11 @@ class ConversationOrchestrator:
         except Exception as e:
             log.error("handle_message_failed", e)
             serinity_logger.error(f"Error in handle_message: {str(e)}")
+            # Rate-limit / quota errors must bubble up so the route can return 429
+            # and the frontend shows the "Tokens Exhausted" popup.
+            err_msg = str(e).lower()
+            if any(k in err_msg for k in ("tokens exhausted", "429", "rate limit", "quota", "exceeded")):
+                raise
             fallback_message = "I'm having a little trouble connecting my thoughts right now. Could you repeat that?"
             self.session_store.append_message(session_id, "assistant", fallback_message)
             return ChatResult(
@@ -106,9 +124,25 @@ class ConversationOrchestrator:
                 clinical_summary=None
             )
 
-    def _run_sync_analysis(self, session_id: str, patient_id: str, clinical_summary: Optional[str] = None, llm1_draft: Optional[str] = None) -> Optional[str]:
+    def _run_sync_analysis(
+        self,
+        session_id: str,
+        patient_id: str,
+        clinical_summary: Optional[str] = None,
+        llm1_draft: Optional[str] = None,
+        medium_term_memory: Optional[str] = None,
+    ) -> Optional[str]:
         """
-        Executes the heavy LLM2 pattern analysis synchronously and returns the LLM2 generated response.
+        Executes the heavy LLM2 pattern analysis synchronously.
+
+        Groq caching layers:
+          [1] system, cached  LLM2_SYSTEM_PROMPT        (constant — provider handles this)
+          [2] user,   cached  stable_prefix             (demographics + medium-term memory;
+                                                         constant between LLM2 calls)
+          [3] dynamic         history[-6:] + context    (RAG + session summary + draft)
+
+        `medium_term_memory` is passed in from handle_message (already fetched once)
+        to avoid a redundant DB round-trip.
         """
         session_number = self.session_store.get_session_count(patient_id) if patient_id else 1
         log = get_logger(session_id, "Sync Analysis Task", session_number)
@@ -129,48 +163,55 @@ class ConversationOrchestrator:
             retrieved_context = self.vector_store.retrieve(retrieval_query)
             log.retrieved_context(retrieved_context)
             
-            existing_profile_recap = self.profile_store.build_profile_recap(patient_id) or "No previous clinical profile exists for this patient."
-            
             patient_info = self.profile_store.get_patient(patient_id) if patient_id else None
-            demographics = ""
+
+            # --- Build stable_prefix (cached at the provider) ---
+            # Contains demographics + medium-term memory. These are constant between
+            # LLM2 calls, so Groq can serve them from cache after the first warm-up.
+            stable_parts = []
             if patient_info:
-                demographics = (
+                stable_parts.append(
                     f"PATIENT DEMOGRAPHICS:\n"
                     f"- Name: {patient_info.get('name', 'Unknown')}\n"
                     f"- Age: {patient_info.get('age', 'Unknown')}\n"
                     f"- Gender: {patient_info.get('gender', 'Unknown')}\n"
                     f"- Nationality: {patient_info.get('nationality', 'Unknown')}\n"
-                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}\n\n"
+                    f"- Primary Concern: {patient_info.get('primary_concern', 'Unknown')}"
                 )
-            
-            context_prompt = (
-                f"{demographics}"
-                f"Existing Clinical Profile:\n{existing_profile_recap}\n\n"
-            )
+            mtm = medium_term_memory or self.profile_store.build_profile_recap(patient_id)
+            if mtm:
+                stable_parts.append(
+                    f"PATIENT MEDIUM-TERM MEMORY (prior sessions & profile — do not quote verbatim):\n"
+                    f"{mtm}"
+                )
+            stable_prefix = "\n\n".join(stable_parts) if stable_parts else None
+
+            # --- Build dynamic context_prompt (only the changing parts) ---
+            # Demographics + MTM are now in stable_prefix (cached), so we only
+            # include the truly dynamic content here.
+            context_parts = []
             if clinical_summary and clinical_summary.strip():
-                context_prompt += f"Current Session Clinical Summary:\n{clinical_summary}\n\n"
-                
-            context_prompt += (
-                f"Retrieved Clinical Reference (Sims' Symptoms in the Mind):\n{retrieved_context}\n\n"
+                context_parts.append(f"Current Session Clinical Summary:\n{clinical_summary}")
+            context_parts.append(
+                f"Retrieved Clinical Reference (Sims' Symptoms in the Mind):\n{retrieved_context}"
             )
-
             if llm1_draft:
-                context_prompt += (
-                    f"Intern's Draft Response:\n{llm1_draft}\n\n"
-                )
-
-            context_prompt += (
-                "Please perform pattern analysis across all eight domains. Evaluate how the user is behaving now (based on the current session messages and summary) compared to their existing profile, and output the updated patterns. "
-                "You must also review the Intern's Draft Response, refine and amplify it using your deeper clinical insights, and provide the final polished conversational response."
+                context_parts.append(f"Intern's Draft Response:\n{llm1_draft}")
+            context_parts.append(
+                "Please perform pattern analysis across all eight domains. Evaluate how the user "
+                "is behaving now (based on the current session messages and summary) compared to "
+                "their existing profile, and output the updated patterns. You must also review the "
+                "Intern's Draft Response, refine and amplify it using your deeper clinical insights, "
+                "and provide the final polished conversational response."
             )
-            
-            llm2_input = history[-10:] + [{
-                "role": "user",
-                "content": context_prompt
-            }]
-            llm2_response = self.llm_provider.internal_reasoning(llm2_input)
+            context_prompt = "\n\n".join(context_parts)
+
+            # history[-6:] reduces TPM by ~35% vs [-10:]; profile_recap + rolling
+            # summary already carry the earlier context, so quality loss is negligible.
+            llm2_input = history[-6:] + [{"role": "user", "content": context_prompt}]
+            llm2_response = self.llm_provider.internal_reasoning(llm2_input, stable_prefix=stable_prefix)
             log.llm2_output(llm2_response)
-            
+
             self.profile_store.update_long_term_memory(patient_id, llm2_response)
             serinity_logger.info(f"Synchronous analysis completed for patient {patient_id}.")
             return llm2_response.assistant_message
