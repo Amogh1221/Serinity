@@ -32,6 +32,7 @@ langchain-ollama
 
 # Audio Processing (STT)
 funasr
+torch
 torchaudio
 soundfile
 librosa
