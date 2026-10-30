@@ -11,12 +11,14 @@ async def session_sweeper_task():
     """Background task to sweep idle sessions every 5 minutes."""
     while True:
         try:
+            # Sleep for 5 minutes before checking for abandoned sessions
+            await asyncio.sleep(300)
             # Sweep sessions inactive for 30 minutes
             patient_service.sweep_abandoned_sessions(timeout_minutes=30)
+        except asyncio.CancelledError:
+            break
         except Exception as e:
             print(f"[Sweeper Error] {e}")
-        # Sleep for 5 minutes
-        await asyncio.sleep(300)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

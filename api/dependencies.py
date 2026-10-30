@@ -27,7 +27,7 @@ from providers.safety.bert import BertRiskSignal
 from providers.safety.keyword import KeywordRiskSignal
 from providers.safety.cascade import CascadeRiskSignal
 from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from services.auth_service import decode_access_token
 from services.risk_assessment_service import RiskAssessmentService
 from services.conversation_orchestrator import ConversationOrchestrator
@@ -94,7 +94,28 @@ user_store = SQLiteUserStore(db_path=MEMORY_DB_PATH)
 stt_provider = SenseVoiceSTTProvider()
 
 # Setup DI dependencies for FastAPI routes
-def get_llm_provider() -> FallbackLLMProvider:
+def get_llm_provider(request: Request = None) -> FallbackLLMProvider:
+    if request:
+        user_hf_token = request.headers.get("x-hf-token")
+        user_groq_key = request.headers.get("x-groq-key")
+        user_custom_key = request.headers.get("x-custom-api-key")
+
+        token = user_hf_token or (user_custom_key if LLM_PROVIDER == "hf" else None)
+        groq_key = user_groq_key or (user_custom_key if LLM_PROVIDER == "groq" else None)
+
+        if token:
+            try:
+                custom_hf = HuggingFaceLLMProvider(model1=HF_LLM1_MODEL, model2=HF_LLM2_MODEL, token=token.strip())
+                return FallbackLLMProvider(providers=[custom_hf])
+            except Exception as e:
+                print(f"[AUTH ERROR] Failed to instantiate custom HuggingFace provider: {e}")
+        elif groq_key:
+            try:
+                custom_groq = GroqLLMProvider(model1=GROQ_LLM1_MODEL, model2=GROQ_LLM2_MODEL, api_key=groq_key.strip())
+                return FallbackLLMProvider(providers=[custom_groq])
+            except Exception as e:
+                print(f"[AUTH ERROR] Failed to instantiate custom Groq provider: {e}")
+
     return llm_provider
 
 def get_vector_store():

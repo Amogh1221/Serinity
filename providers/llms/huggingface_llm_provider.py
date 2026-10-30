@@ -23,16 +23,16 @@ class HuggingFaceLLMProvider:
     system messages instead.
     """
 
-    def __init__(self, model1: str, model2: str):
-        token = os.environ.get("HF_TOKEN")
-        if not token:
+    def __init__(self, model1: str, model2: str, token: str | None = None):
+        resolved_token = token or os.environ.get("HF_TOKEN")
+        if not resolved_token:
             raise RuntimeError(
-                "HF_TOKEN is not set. Add it as a Space Secret on HuggingFace."
+                "HF_TOKEN is not set. Add it as a Space Secret on HuggingFace or supply a user token."
             )
         self.model1 = model1
         self.model2 = model2
         # Single client — the model is passed per-call so one client is enough
-        self.client = InferenceClient(api_key=token)
+        self.client = InferenceClient(api_key=resolved_token)
 
     # ------------------------------------------------------------------
     # Internal helpers

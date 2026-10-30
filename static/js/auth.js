@@ -70,6 +70,7 @@ export async function deleteAccount() {
 
 export function logout() {
   localStorage.removeItem('serinity_token');
+  sessionStorage.removeItem('serinity_user_hf_token');
 }
 
 export function isAuthenticated() {

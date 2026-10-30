@@ -77,3 +77,48 @@ def test_chat_routes(client: TestClient, user_store):
     )
     assert response.status_code == 200
     assert response.json() == {"status": "ended"}
+
+def test_start_session_tokens_exhausted(client: TestClient, user_store, mock_llm_provider):
+    from services.auth_service import get_password_hash, create_access_token
+    from unittest.mock import MagicMock
+    user_id = user_store.create_user(
+        username="exhausted_user",
+        email="exhausted@example.com",
+        password_hash=get_password_hash("password123")
+    )
+    token = create_access_token(data={"sub": user_id, "username": "exhausted_user"})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Simulate token exhaustion from LLM1
+    mock_llm_provider.psychiatrist_response = MagicMock(
+        side_effect=RuntimeError("Tokens Exhausted: 402 Payment Required")
+    )
+
+    response = client.post("/start", headers=headers)
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Tokens Exhausted"
+
+def test_chat_text_tokens_exhausted(client: TestClient, user_store, session_store, mock_llm_provider):
+    from services.auth_service import get_password_hash, create_access_token
+    from unittest.mock import MagicMock
+    user_id = user_store.create_user(
+        username="exhausted_user2",
+        email="exhausted2@example.com",
+        password_hash=get_password_hash("password123")
+    )
+    token = create_access_token(data={"sub": user_id, "username": "exhausted_user2"})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    sess_id = session_store.create_session()
+
+    mock_llm_provider.psychiatrist_response = MagicMock(
+        side_effect=RuntimeError("Tokens Exhausted: 402 Payment Required")
+    )
+
+    response = client.post(
+        "/chat_text",
+        json={"session_id": sess_id, "message": "Hello"},
+        headers=headers
+    )
+    assert response.status_code == 429
+    assert response.json()["detail"] == "Tokens Exhausted"

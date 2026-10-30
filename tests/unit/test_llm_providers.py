@@ -183,3 +183,38 @@ class TestOllamaLLMProvider:
         assert isinstance(result, LLM1Output)
         assert result.intent == "CONTINUE"
         assert result.assistant_message == "I hear you."
+
+
+# ─────────────────────── HuggingFace LLM Provider ───────────────────────────
+
+class TestHuggingFaceLLMProvider:
+    """Tests for HuggingFaceLLMProvider custom token handling."""
+
+    def test_custom_token_init(self):
+        from providers.llms.huggingface_llm_provider import HuggingFaceLLMProvider
+
+        with patch("providers.llms.huggingface_llm_provider.InferenceClient") as MockClient:
+            provider = HuggingFaceLLMProvider(
+                model1="test/model1",
+                model2="test/model2",
+                token="hf_custom_user_token"
+            )
+            MockClient.assert_called_once_with(api_key="hf_custom_user_token")
+            assert provider.model1 == "test/model1"
+            assert provider.model2 == "test/model2"
+
+    def test_custom_header_in_dependencies(self):
+        from unittest.mock import MagicMock
+        from api.dependencies import get_llm_provider
+
+        mock_request = MagicMock()
+        mock_request.headers.get.side_effect = lambda key: "hf_custom_token_123" if key == "x-hf-token" else None
+
+        with patch("api.dependencies.HuggingFaceLLMProvider") as MockHFProvider:
+            provider = get_llm_provider(request=mock_request)
+            MockHFProvider.assert_called_once_with(
+                model1="meta-llama/Llama-3.1-8B-Instruct",
+                model2="meta-llama/Llama-3.3-70B-Instruct",
+                token="hf_custom_token_123"
+            )
+            assert provider is not None

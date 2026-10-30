@@ -376,6 +376,47 @@
     </div>
   </div>
 
+  <!-- Credits / Custom API Key Modal -->
+  <div id="creditsModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-[80] flex flex-col items-center justify-center p-4 fade-in">
+    <div class="bg-paper border border-ink p-8 max-w-md w-full shadow-2xl">
+      <div class="flex items-center gap-2 mb-3">
+        <span class="inline-block w-3 h-3 rounded-full bg-signal"></span>
+        <h2 class="text-2xl font-display text-ink" id="creditsModalTitle">Inference Credits Depleted</h2>
+      </div>
+      <p class="text-clay text-sm mb-4 leading-relaxed">
+        The server's shared inference credits have been exhausted. You can close this session, or provide your own <strong>Hugging Face API Key / Token</strong> to continue immediately using your personal account.
+      </p>
+
+      <div class="space-y-3 mb-6">
+        <div>
+          <label class="block text-xs font-utility text-clay uppercase mb-1">
+            Hugging Face User Access Token:
+          </label>
+          <input 
+            type="password" 
+            id="hfApiKeyInput" 
+            placeholder="hf_..." 
+            class="w-full bg-paper border border-ink p-2.5 text-sm font-utility text-ink focus:outline-none focus:border-moss transition"
+            autocomplete="off"
+          />
+        </div>
+        <p class="text-[11px] text-clay/80 font-utility">
+          Your key is saved only in this browser session and sent securely per-request. Get your free token at 
+          <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" class="text-moss underline hover:text-ink">huggingface.co/settings/tokens</a>.
+        </p>
+      </div>
+      
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button id="creditsModalCloseBtn" class="flex-1 bg-transparent border border-ink text-ink hover:bg-ink hover:text-paper transition py-2.5 font-utility uppercase tracking-widest text-xs">
+          Close Session
+        </button>
+        <button id="creditsModalSubmitBtn" class="flex-1 bg-moss text-paper hover:bg-moss/90 transition py-2.5 font-utility uppercase tracking-widest text-xs font-semibold">
+          Save &amp; Continue
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Delete Account Confirmation Modal -->
   <div id="deleteAccountConfirmModal" style="display: none;" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4">
     <div class="panel p-8 max-w-sm w-full shadow-lg">

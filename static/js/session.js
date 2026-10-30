@@ -90,8 +90,23 @@ export async function sendTextMessage(message, emotion = null) {
     }
   } catch (err) {
     ui.removeTyping();
-    if (err.message && (err.message.includes("Tokens Exhausted") || err.message.includes("429"))) {
-      ui.showAlert("Tokens Exhausted", "Your LLM provider tokens have been exhausted. Please wait or upgrade your plan.");
+    const isTokensExhausted = err.status === 429 || (err.message && (
+      err.message.includes("Tokens Exhausted") ||
+      err.message.includes("429") ||
+      err.message.includes("402")
+    ));
+
+    if (isTokensExhausted) {
+      ui.showCreditsModal({
+        onClose: () => {
+          ui.setStatusText("Session paused due to exhausted credits.");
+        },
+        onSubmitKey: async (newKey) => {
+          sessionStorage.setItem("serinity_user_hf_token", newKey);
+          ui.setStatusText("Custom API Key applied. Retrying...");
+          await sendTextMessage(message, emotion);
+        }
+      });
     } else {
       ui.addMessage("I apologize, but I'm having trouble connecting right now.", "assistant");
     }
@@ -127,12 +142,37 @@ export async function startActualSession(pId) {
     handleAssistantResponses(data.assistant_message);
   } catch (e) {
     console.error("Failed to start session:", e);
-    ui.showAlert("Session Failed", e.message || "Failed to start session. Please try again.");
-    ui.switchScreen("dashboardScreen");
     const startButton = document.getElementById("dashboardStartBtn");
     if (startButton) {
-      startButton.textContent = "START CONSULTATION";
+      startButton.textContent = "NEW SESSION";
       startButton.disabled = false;
+    }
+
+    const isTokensExhausted = e.status === 429 || (e.message && (
+      e.message.includes("Tokens Exhausted") ||
+      e.message.includes("429") ||
+      e.message.includes("402")
+    ));
+
+    if (isTokensExhausted) {
+      ui.showCreditsModal({
+        onClose: () => {
+          ui.switchScreen("dashboardScreen");
+        },
+        onSubmitKey: async (newKey) => {
+          sessionStorage.setItem("serinity_user_hf_token", newKey);
+          ui.switchScreen("loadingScreen", false);
+          const sb = document.getElementById("startButton");
+          if (sb) {
+            sb.textContent = "Connecting with custom key...";
+            sb.disabled = true;
+          }
+          await startActualSession(pId);
+        }
+      });
+    } else {
+      ui.showAlert("Session Failed", e.message || "Failed to start session. Please try again.");
+      ui.switchScreen("dashboardScreen");
     }
   }
 }

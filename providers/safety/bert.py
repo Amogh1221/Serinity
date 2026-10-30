@@ -29,15 +29,21 @@ class BertRiskSignal:
             logger.info("BertRiskSignal loaded from local cache.")
         except Exception:
             logger.info("Local cache not found. Downloading BERT model from HuggingFace (first-time setup)...")
-            self.classifier = pipeline(
-                "text-classification",
-                model=model_name,
-                truncation=True,
-                max_length=512,
-            )
-            logger.info("BertRiskSignal downloaded and loaded successfully.")
+            try:
+                self.classifier = pipeline(
+                    "text-classification",
+                    model=model_name,
+                    truncation=True,
+                    max_length=512,
+                )
+                logger.info("BertRiskSignal downloaded and loaded successfully.")
+            except Exception as e:
+                logger.warning(f"Could not load BertRiskSignal (offline mode): {e}")
+                self.classifier = None
 
     def check(self, message: str, llm1_output: LLM1Output, llm2_output: Optional[LLM2Output] = None) -> bool:
+        if not self.classifier:
+            return False
         if not message or not message.strip():
             return False
             

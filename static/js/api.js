@@ -7,6 +7,11 @@ export function getToken() {
   return localStorage.getItem('serinity_token');
 }
 
+// Helper to get user-provided HF API Key from session storage
+export function getUserHfToken() {
+  return sessionStorage.getItem('serinity_user_hf_token');
+}
+
 // Global fetch wrapper for auth
 export async function authFetch(url, options = {}) {
   const token = getToken();
@@ -14,6 +19,11 @@ export async function authFetch(url, options = {}) {
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const userHfToken = getUserHfToken();
+  if (userHfToken) {
+    headers['X-HF-Token'] = userHfToken;
   }
   
   // Don't override FormData headers
@@ -98,7 +108,9 @@ export async function startSessionReq(patientId) {
       const data = await res.json();
       errorDetail = data.detail || errorDetail;
     } catch(e) {}
-    throw new Error(errorDetail);
+    const err = new Error(errorDetail);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -119,7 +131,9 @@ export async function sendChatText(sessionId, patientId, message, emotion) {
       const data = await res.json();
       errorDetail = data.detail || errorDetail;
     } catch(e) {}
-    throw new Error(errorDetail);
+    const err = new Error(errorDetail);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }

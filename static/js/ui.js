@@ -240,3 +240,55 @@ export function showAlert(title, text) {
   
   alertModal.style.display = "flex";
 }
+
+export function showCreditsModal({ onClose, onSubmitKey }) {
+  const creditsModal = document.getElementById("creditsModal");
+  if (!creditsModal) return;
+
+  const keyInput = document.getElementById("hfApiKeyInput");
+  const closeBtn = document.getElementById("creditsModalCloseBtn");
+  const submitBtn = document.getElementById("creditsModalSubmitBtn");
+
+  // Pre-fill if a key was previously entered in this session
+  const existingKey = sessionStorage.getItem("serinity_user_hf_token") || "";
+  if (keyInput) {
+    keyInput.value = existingKey;
+    keyInput.classList.remove("border-signal");
+  }
+
+  const closeModal = () => {
+    creditsModal.style.display = "none";
+  };
+
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      closeModal();
+      if (onClose) onClose();
+    };
+  }
+
+  if (submitBtn) {
+    submitBtn.onclick = () => {
+      const enteredKey = keyInput ? keyInput.value.trim() : "";
+      if (!enteredKey) {
+        if (keyInput) {
+          keyInput.classList.add("border-signal");
+          keyInput.focus();
+        }
+        return;
+      }
+      closeModal();
+      if (onSubmitKey) onSubmitKey(enteredKey);
+    };
+  }
+
+  creditsModal.style.display = "flex";
+  if (keyInput) keyInput.focus();
+}
+
+export function hideCreditsModal() {
+  const creditsModal = document.getElementById("creditsModal");
+  if (creditsModal) {
+    creditsModal.style.display = "none";
+  }
+}

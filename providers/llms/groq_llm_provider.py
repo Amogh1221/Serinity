@@ -58,10 +58,10 @@ class GroqLLMProvider:
       - LLM1: ~1,000-1,100 cached tokens per turn after warm-up
       - LLM2: ~1,200-1,400 cached tokens per ANALYZE call
     """
-    def __init__(self, model1: str, model2: str):
+    def __init__(self, model1: str, model2: str, api_key: str | None = None):
         self.model1 = model1
         self.model2 = model2
-        self.client = Groq()
+        self.client = Groq(api_key=api_key) if api_key else Groq()
 
     def generate_opening_context(self, profile_recap: str | None) -> list:
         if profile_recap:
